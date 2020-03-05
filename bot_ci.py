@@ -166,6 +166,74 @@ class BotCi:
                 commit = commit.parents[0]
         return None
 
+    def call_create_virtualenv(self):
+        """Create virtualenv if not exist"""
+        if self.virtualenv_path and not os.path.exists(self.virtualenv_path):
+            logging.info('Create virtualenv: %s' % ' '.join(self.create_virtualenv))
+            process = subprocess.Popen(self.create_virtualenv, cwd=self.repo_path)
+            process.wait()
+        else:
+            logging.info('Virtualenv %s already exist' % self.virtualenv_path)
+
+    def call_install_requirements(self):
+        """Install requirements"""
+        logging.info('Install requirements: %s' % ' '.join(self.install_requirements))
+        process = subprocess.Popen(self.install_requirements, cwd=self.repo_path)
+        process.wait()
+
+    def call_run_tests(self):
+        """Run tests"""
+        if self.run_tests and not self.skip_tests:
+            logging.info('Run tests %s' % ' '.join(self.run_tests))
+            process = subprocess.Popen(self.run_tests, cwd=self.repo_path)
+            process.wait()
+
+    def stop_bot(self):
+        """Stop running bot"""
+        # Check pid file
+        if os.path.exists(self.pid_file_path):
+            logging.info('Stop started bot')
+            try:
+                with open(self.pid_file_path, 'r') as f:
+                    pid = int(f.read())
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                logging.info('Process already stopped')
+
+    def start_bot(self):
+        """Start the bot"""
+        # Run bot
+        logging.info('Run bot %s: %s' % (self.version, ' '.join(self.run_bot)))
+        process = subprocess.Popen(self.run_bot, cwd=self.repo_path)
+        self.pid = process.pid
+
+        # Save pid
+        logging.info('Save pid %s' % self.pid)
+        with open(self.pid_file_path, 'w') as f:
+            f.write(str(self.pid))
+
+    def restart_bot(self):
+        """Stop and restart the bot"""
+        self.stop_bot()
+        self.start_bot()
+
+    def send_message(self, msg):
+        if self.bot and self.chat_id:
+            logging.info('Send message to %s: %s' % (self.chat_id, msg))
+            self.bot.send_message(
+                chat_id=self.chat_id,
+                text=msg,
+            )
+        else:
+            logging.info('Bot token or chat_id not configured')
+
+    def send_new_version_message(self):
+        self.send_message(self.msg_text % {
+                'old_version': self.old_version,
+                'version': self.version,
+                'author': self.author,
+        })
+
     def run(self):
         self.is_new_repo = not os.path.exists(self.repo_path)
 
@@ -210,54 +278,16 @@ class BotCi:
                 # Go to last tag
                 repo.head.reset(self.last_tag, index=True, working_tree=True)
 
-                # Create virtualenv if not exist
-                if self.virtualenv_path and not os.path.exists(self.virtualenv_path):
-                    logging.info('Create virtualenv: %s' % ' '.join(self.create_virtualenv))
-                    process = subprocess.Popen(self.create_virtualenv, cwd=self.repo_path)
-                    process.wait()
+                # Release
+                self.call_create_virtualenv()
 
-                # Install requirements
-                logging.info('Install requirements: %s' % ' '.join(self.install_requirements))
-                process = subprocess.Popen(self.install_requirements, cwd=self.repo_path)
-                process.wait()
+                self.call_install_requirements()
 
-                # Run tests
-                if self.run_tests and not self.skip_tests:
-                    logging.info('Run tests %s' % ' '.join(self.run_tests))
-                    process = subprocess.Popen(self.run_tests, cwd=self.repo_path)
-                    process.wait()
+                self.call_run_tests()
 
-                # Check pid file
-                if os.path.exists(self.pid_file_path):
-                    logging.info('Stop started bot')
-                    try:
-                        with open(self.pid_file_path, 'r') as f:
-                            pid = int(f.read())
-                        os.kill(pid, signal.SIGTERM)
-                    except OSError:
-                        logging.info('Process already stopped')
+                self.restart_bot()
 
-                # Run bot
-                logging.info('Run bot %s: %s' % (self.version, ' '.join(self.run_bot)))
-                process = subprocess.Popen(self.run_bot, cwd=self.repo_path)
-                self.pid = process.pid
-
-                if self.bot:
-                    msg_text = self.msg_text % {
-                        'old_version': self.old_version,
-                        'version': self.version,
-                        'author': self.author,
-                    }
-                    logging.info('Send message to %s: %s' % (self.chat_id, msg_text))
-                    self.bot.send_message(
-                        chat_id=self.chat_id,
-                        text=msg_text,
-                    )
-
-                # Save pid
-                logging.info('Save pid %s' % self.pid)
-                with open(self.pid_file_path, 'w') as f:
-                    f.write(str(self.pid))
+                self.send_new_version_message()
             else:
                 logging.info('Repo up to date on %s' % self.version)
         else:
