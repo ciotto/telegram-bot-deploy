@@ -12,8 +12,8 @@ from git import Repo
 load_dotenv(find_dotenv())
 
 
-def getenv(key, parser=None):
-    value = os.getenv(key, None)
+def getenv(key, default=None, parser=None):
+    value = os.getenv(key, default)
     if value and parser:
         return parser(value)
     return value
@@ -21,18 +21,19 @@ def getenv(key, parser=None):
 
 REPO_URL = getenv('REPO_URL')
 REPO_PATH = getenv('REPO_PATH', 'repo')
+BRANCH = getenv('BRANCH', 'master')
 
-SSH_KEY = getenv('SSH_KEY')
-CHAT_ID = getenv('CHAT_ID', int)
+SSH_KEY = getenv('SSH_KEY', 'id_deployment_key')
+CHAT_ID = getenv('CHAT_ID', parser=int)
 BOT_TOKEN = getenv('BOT_TOKEN')
-MSG_TEXT = getenv('MSG_TEXT')
+MSG_TEXT = getenv('MSG_TEXT', "I'm at new version %(version)s!")
 
 PID_FILE_PATH = getenv('PID_FILE_PATH')
 
-VIRTUALENV_PATH = getenv('VIRTUALENV_PATH')
+VIRTUALENV_PATH = getenv('VIRTUALENV_PATH', '.virtualenv')
 CREATE_VIRTUALENV = getenv('CREATE_VIRTUALENV')
 
-REQUIREMENTS_PATH = getenv('REQUIREMENTS_PATH')
+REQUIREMENTS_PATH = getenv('REQUIREMENTS_PATH', 'requirements.txt')
 INSTALL_REQUIREMENTS = getenv('INSTALL_REQUIREMENTS')
 
 RUN_TESTS = getenv('RUN_TESTS')
@@ -49,6 +50,7 @@ class BotCi:
             self,
             repo_url=REPO_URL,
             repo_path=REPO_PATH,
+            branch=BRANCH,
 
             force=False,
 
@@ -73,12 +75,13 @@ class BotCi:
     ):
         # Set defaults
         self.repo_url = repo_url
-        self.repo_path = repo_path or 'repo'
+        self.repo_path = repo_path
+        self.branch = branch
 
-        self.msg_text = msg_text or "I'm at new version %(version)s!"
+        self.msg_text = msg_text
 
         # SSH config
-        self.ssh_key = os.path.abspath(ssh_key or 'id_deployment_key')
+        self.ssh_key = os.path.abspath(ssh_key)
         self.ssh_cmd = 'ssh -i %s' % self.ssh_key
 
         # Bot config
@@ -96,13 +99,13 @@ class BotCi:
 
         # Virtualenv
         self.python_executable = 'python3'
-        self.virtualenv_path = virtualenv_path or '.virtualenv'
+        self.virtualenv_path = virtualenv_path
         self.create_virtualenv = create_virtualenv.split(' ') if create_virtualenv else [
             'virtualenv', self.virtualenv_path, '--system-site-packages', '-p', self.python_executable
         ]
 
         # Requirements
-        self.requirements_path = requirements_path or 'requirements.txt'
+        self.requirements_path = requirements_path
         self.install_requirements = install_requirements.split(' ') if install_requirements else [
             os.path.join(self.virtualenv_path, 'bin', 'pip'), 'install', '-r', self.requirements_path
         ]
@@ -118,22 +121,55 @@ class BotCi:
             os.path.join(self.virtualenv_path, 'bin', 'python'), 'bot.py'
         ]
 
-        self.new_repo = False
+        # True when local branch does not exist
+        self.is_new_repo = False
+
+        self.tags_map = {}
+
+        # The pid of the daemon process
         self.pid = None
+
+        # Versions name
+        self.old_version = None
         self.version = None
 
-    def check(self):
-        # TODO Do more check
-        if not self.repo_url:
-            logging.error('Missing repo_url')
-            exit(1)
+        # Last commit on remote
+        self.remote_commit = None
 
-    def run(self):
+        # The last tag on branch
+        self.last_tag = None
+
+        # Author of this version
+        self.author = None
+
         self.check()
 
-        self.new_repo = not os.path.exists(self.repo_path)
+    def error(self, msg):
+        logging.error(msg)
+        exit(1)
 
-        if self.new_repo:
+    def check(self):
+        """Check config"""
+        # TODO Do more check
+        if not self.repo_url:
+            self.error('Missing repo_url')
+
+    def get_last_tag(self, commit):
+        """Find last tag by commit"""
+        if self.tags_map:
+            while True:
+                if commit in self.tags_map:
+                    return self.tags_map[commit]
+                elif not commit.parents:
+                    break
+                # TODO check with merge
+                commit = commit.parents[0]
+        return None
+
+    def run(self):
+        self.is_new_repo = not os.path.exists(self.repo_path)
+
+        if self.is_new_repo:
             logging.info('Clone repo %s to %s' % (self.repo_url, self.repo_path))
             Repo.clone_from(self.repo_url, self.repo_path, env={'GIT_SSH_COMMAND': self.ssh_cmd})
 
@@ -141,22 +177,40 @@ class BotCi:
         logging.info('Init repo %s' % self.repo_path)
         repo = Repo.init(self.repo_path)
 
+        # Set old version
+        self.old_version = repo.git.describe('--always')
+
+        # Generate tags map
+        self.tags_map = dict(map(lambda x: (x.commit, x), repo.tags))
+
         # Fetch origin
         logging.info('Fetch remote %s' % self.repo_url)
         with repo.git.custom_environment(GIT_SSH_COMMAND=self.ssh_cmd):
             repo.remotes.origin.fetch(['--tags', '-f'])
 
-        old_version = repo.git.describe('--always')
+            for ref in repo.remotes.origin.refs:
+                if ref.name == 'origin/%s' % self.branch:
+                    self.remote_commit = ref
+
+            if not self.remote_commit:
+                self.error('Missing origin/%s' % self.branch)
+
+        # Find last tag on branch
+        self.last_tag = self.get_last_tag(self.remote_commit.commit)
 
         # Go to last tag
-        if repo.tags:
-            repo.head.reset(repo.tags[-1], index=True, working_tree=True)
+        if self.last_tag:
+            # Set version name
+            self.version = self.last_tag.name
 
-            # Get version
-            self.version = repo.tags[-1].name
+            # Set author name
+            self.author = self.last_tag.tag.object.author.name
 
-            if self.new_repo or old_version != self.version or self.force:
-                # Create virtualenv
+            if self.last_tag.tag.object != repo.head.commit:
+                # Go to last tag
+                repo.head.reset(self.last_tag, index=True, working_tree=True)
+
+                # Create virtualenv if not exist
                 if self.virtualenv_path and not os.path.exists(self.virtualenv_path):
                     logging.info('Create virtualenv: %s' % ' '.join(self.create_virtualenv))
                     process = subprocess.Popen(self.create_virtualenv, cwd=self.repo_path)
@@ -185,12 +239,14 @@ class BotCi:
 
                 # Run bot
                 logging.info('Run bot %s: %s' % (self.version, ' '.join(self.run_bot)))
-                process = subprocess.Popen(self.run_bot)
+                process = subprocess.Popen(self.run_bot, cwd=self.repo_path)
                 self.pid = process.pid
 
                 if self.bot:
                     msg_text = self.msg_text % {
+                        'old_version': self.old_version,
                         'version': self.version,
+                        'author': self.author,
                     }
                     logging.info('Send message to %s: %s' % (self.chat_id, msg_text))
                     self.bot.send_message(
@@ -205,7 +261,7 @@ class BotCi:
             else:
                 logging.info('Repo up to date on %s' % self.version)
         else:
-            logging.info('No tags')
+            logging.info('No tags on branch %s' % self.branch)
 
 
 if __name__ == '__main__':
@@ -222,6 +278,8 @@ if __name__ == '__main__':
                         help='The URL of the repo to be used')
     parser.add_argument('-p', '--repo_path', nargs='?', type=str, default=None,
                         help='The local path of the repo')
+    parser.add_argument('-b', '--branch', nargs='?', type=str, default=None,
+                        help='The branch used for deploy')
 
     parser.add_argument('-O', '--force', action='store_true',
                         help='Restart also same versions')
