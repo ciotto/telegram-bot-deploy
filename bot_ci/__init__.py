@@ -9,88 +9,92 @@ from dotenv import load_dotenv, find_dotenv
 from git import Repo
 
 # Load .env
-load_dotenv(find_dotenv())
+from bot_ci.utilities import getenv
+
+logger = logging.getLogger(__name__)
 
 
-def getenv(key, default=None, parser=None):
-    value = os.getenv(key, default)
-    if value and parser:
-        return parser(value)
-    return value
+# Read enviroment variable
+def read_environments():
+    # Load .env
+    load_dotenv(find_dotenv())
 
+    return dict(
+        repo_url=getenv('REPO_URL'),
+        repo_path=getenv('REPO_PATH'),
+        branch=getenv('BRANCH', 'master'),
 
-REPO_URL = getenv('REPO_URL')
-REPO_PATH = getenv('REPO_PATH', 'repo')
-BRANCH = getenv('BRANCH', 'master')
+        ssh_key=getenv('SSH_KEY', 'id_deployment_key'),
 
-SSH_KEY = getenv('SSH_KEY', 'id_deployment_key')
-CHAT_ID = getenv('CHAT_ID', parser=int)
-BOT_TOKEN = getenv('BOT_TOKEN')
-MSG_TEXT = getenv('MSG_TEXT', "I'm at new version %(version)s!")
+        chat_id=getenv('CHAT_ID', parser=int),
+        bot_token=getenv('BOT_TOKEN'),
+        msg_text=getenv('MSG_TEXT', "I'm at new version %(version)s!"),
 
-PID_FILE_PATH = getenv('PID_FILE_PATH')
+        pid_file_path=getenv('PID_FILE_PATH'),
 
-VIRTUALENV_PATH = getenv('VIRTUALENV_PATH', '.virtualenv')
-CREATE_VIRTUALENV = getenv('CREATE_VIRTUALENV')
+        python_executable=getenv('PYTHON_EXECUTABLE'),
+        virtualenv_path=getenv('VIRTUALENV_PATH', '.virtualenv'),
+        create_virtualenv=getenv('CREATE_VIRTUALENV'),
 
-REQUIREMENTS_PATH = getenv('REQUIREMENTS_PATH', 'requirements.txt')
-INSTALL_REQUIREMENTS = getenv('INSTALL_REQUIREMENTS')
+        requirements_path=getenv('REQUIREMENTS_PATH'),
+        install_requirements=getenv('INSTALL_REQUIREMENTS'),
 
-RUN_TESTS = getenv('RUN_TESTS')
+        run_tests=getenv('RUN_TESTS'),
 
-RUN_BOT = getenv('RUN_BOT')
+        run_bot=getenv('RUN_BOT'),
 
-LOGGING_FORMAT = getenv('LOGGING_FORMAT')
-LOGGING_LEVEL = getenv('LOGGING_LEVEL')
-LOGGING_FILENAME = getenv('LOGGING_FILENAME')
+        logging_format=getenv('LOGGING_FORMAT', '%(asctime)s - %(levelname)s - %(message)s'),
+        logging_level=getenv('LOGGING_LEVEL', logging.INFO, parser=int),
+        logging_filename=getenv('LOGGING_FILENAME'),
+    )
 
 
 class BotCi:
     def __init__(
-            self,
-            repo_url=REPO_URL,
-            repo_path=REPO_PATH,
-            branch=BRANCH,
+        self,
+        repo_url=None,
+        repo_path=None,
+        branch=None,
 
-            force=False,
+        force=False,
 
-            ssh_key=SSH_KEY,
+        ssh_key=None,
 
-            chat_id=CHAT_ID,
-            bot_token=BOT_TOKEN,
-            msg_text=MSG_TEXT,
+        chat_id=None,
+        bot_token=None,
+        msg_text=None,
 
-            pid_file_path=PID_FILE_PATH,
+        pid_file_path=None,
 
-            virtualenv_path=VIRTUALENV_PATH,
-            create_virtualenv=CREATE_VIRTUALENV,
+        python_executable=None,
+        virtualenv_path=None,
+        create_virtualenv=None,
 
-            requirements_path=REQUIREMENTS_PATH,
-            install_requirements=INSTALL_REQUIREMENTS,
+        requirements_path=None,
+        install_requirements=None,
 
-            run_tests=RUN_TESTS,
-            skip_tests=False,
+        run_tests=None,
+        skip_tests=False,
 
-            run_bot=RUN_BOT,
+        run_bot=None,
+        **kwargs
     ):
         # Set defaults
         self.repo_url = repo_url
-        self.repo_path = repo_path
+        self.repo_path = repo_path or 'repo'
         self.branch = branch
 
-        self.msg_text = msg_text
-
         # SSH config
-        self.ssh_key = os.path.abspath(ssh_key)
-        self.ssh_cmd = 'ssh -i %s' % self.ssh_key
+        self.ssh_key = os.path.abspath(ssh_key) if ssh_key else None
+        self.ssh_cmd = 'ssh -i %s' % self.ssh_key if self.ssh_key else None
 
         # Bot config
         self.chat_id = chat_id
         self.bot_token = bot_token
-        self.msg_text = msg_text
         self.bot = None
         if self.bot_token:
             self.bot = telegram.Bot(self.bot_token)
+        self.msg_text = msg_text
 
         # pid file
         self.pid_file_path = pid_file_path or os.path.join(self.repo_path, '.pid')
@@ -98,32 +102,35 @@ class BotCi:
         self.force = force
 
         # Virtualenv
-        self.python_executable = 'python3'
+        self.python_executable = python_executable or 'python3'
         self.virtualenv_path = virtualenv_path
-        self.create_virtualenv = create_virtualenv.split(' ') if create_virtualenv else [
-            'virtualenv', self.virtualenv_path, '--system-site-packages', '-p', self.python_executable
-        ]
+        self.bin_path = os.path.join(self.virtualenv_path, 'bin') if self.virtualenv_path else None
+        self.create_virtualenv = None
+        if create_virtualenv:
+            self.create_virtualenv = create_virtualenv.split(' ')
+        elif self.virtualenv_path:
+            self.create_virtualenv = [
+                'virtualenv', self.virtualenv_path, '--no-site-packages', '-p', self.python_executable
+            ]
 
         # Requirements
-        self.requirements_path = requirements_path
+        self.requirements_path = requirements_path or 'requirements.txt'
         self.install_requirements = install_requirements.split(' ') if install_requirements else [
-            os.path.join(self.virtualenv_path, 'bin', 'pip'), 'install', '-r', self.requirements_path
+            os.path.join(self.bin_path or '', 'pip'), 'install', '-r', self.requirements_path
         ]
 
         # Tests
         self.run_tests = run_tests.split(' ') if run_tests else [
-            os.path.join(self.virtualenv_path, 'bin', 'pytest')
+            os.path.join(self.bin_path or '', 'pytest')
         ]
         self.skip_tests = skip_tests
 
         # Run
         self.run_bot = run_bot.split(' ') if run_bot else [
-            os.path.join(self.virtualenv_path, 'bin', 'python'), 'bot.py'
+            os.path.join(self.bin_path or '', 'python'), 'bot.py'
         ]
 
         # True when local branch does not exist
-        self.is_new_repo = False
-
         self.tags_map = {}
 
         # The pid of the daemon process
@@ -144,15 +151,19 @@ class BotCi:
 
         self.check()
 
-    def error(self, msg):
-        logging.error(msg)
-        exit(1)
+    def error(self, msg, code=os.EX_IOERR):
+        logger.error(msg)
+        os._exit(code)
 
     def check(self):
         """Check config"""
         # TODO Do more check
         if not self.repo_url:
-            self.error('Missing repo_url')
+            self.error('Missing repo_url', code=os.EX_DATAERR)
+
+    @property
+    def is_new_repo(self):
+        return not os.path.exists(self.repo_path)
 
     def get_last_tag(self, commit):
         """Find last tag by commit"""
@@ -168,23 +179,24 @@ class BotCi:
 
     def call_create_virtualenv(self):
         """Create virtualenv if not exist"""
-        if self.virtualenv_path and not os.path.exists(self.virtualenv_path):
-            logging.info('Create virtualenv: %s' % ' '.join(self.create_virtualenv))
-            process = subprocess.Popen(self.create_virtualenv, cwd=self.repo_path)
-            process.wait()
-        else:
-            logging.info('Virtualenv %s already exist' % self.virtualenv_path)
+        if self.create_virtualenv:
+            if self.virtualenv_path and not os.path.exists(self.virtualenv_path):
+                logger.info('Create virtualenv: %s' % ' '.join(self.create_virtualenv))
+                process = subprocess.Popen(self.create_virtualenv, cwd=self.repo_path)
+                process.wait()
+            else:
+                logger.info('Virtualenv %s already exist' % self.virtualenv_path)
 
     def call_install_requirements(self):
         """Install requirements"""
-        logging.info('Install requirements: %s' % ' '.join(self.install_requirements))
+        logger.info('Install requirements: %s' % ' '.join(self.install_requirements))
         process = subprocess.Popen(self.install_requirements, cwd=self.repo_path)
         process.wait()
 
     def call_run_tests(self):
         """Run tests"""
-        if self.run_tests and not self.skip_tests:
-            logging.info('Run tests %s' % ' '.join(self.run_tests))
+        if not self.skip_tests:
+            logger.info('Run tests %s' % ' '.join(self.run_tests))
             process = subprocess.Popen(self.run_tests, cwd=self.repo_path)
             process.wait()
 
@@ -192,23 +204,23 @@ class BotCi:
         """Stop running bot"""
         # Check pid file
         if os.path.exists(self.pid_file_path):
-            logging.info('Stop started bot')
+            logger.info('Stop started bot')
             try:
                 with open(self.pid_file_path, 'r') as f:
                     pid = int(f.read())
                 os.kill(pid, signal.SIGTERM)
             except OSError:
-                logging.info('Process already stopped')
+                logger.info('Process already stopped')
 
     def start_bot(self):
         """Start the bot"""
         # Run bot
-        logging.info('Run bot %s: %s' % (self.version, ' '.join(self.run_bot)))
+        logger.info('Run bot %s: %s' % (self.version, ' '.join(self.run_bot)))
         process = subprocess.Popen(self.run_bot, cwd=self.repo_path)
         self.pid = process.pid
 
         # Save pid
-        logging.info('Save pid %s' % self.pid)
+        logger.info('Save pid %s' % self.pid)
         with open(self.pid_file_path, 'w') as f:
             f.write(str(self.pid))
 
@@ -218,41 +230,43 @@ class BotCi:
         self.start_bot()
 
     def send_message(self, msg):
+        """Send a message"""
         if self.bot and self.chat_id:
-            logging.info('Send message to %s: %s' % (self.chat_id, msg))
+            logger.info('Send message to %s: %s' % (self.chat_id, msg))
             self.bot.send_message(
                 chat_id=self.chat_id,
                 text=msg,
             )
         else:
-            logging.info('Bot token or chat_id not configured')
+            logger.info('Bot token or chat_id not configured')
 
     def send_new_version_message(self):
+        """Send a message when new version was deployed"""
         self.send_message(self.msg_text % {
                 'old_version': self.old_version,
                 'version': self.version,
                 'author': self.author,
         })
 
-    def run(self):
-        self.is_new_repo = not os.path.exists(self.repo_path)
-
+    def clone_repo(self):
+        """Clone repo if need"""
         if self.is_new_repo:
-            logging.info('Clone repo %s to %s' % (self.repo_url, self.repo_path))
+            logger.info('Clone repo %s to %s' % (self.repo_url, self.repo_path))
             Repo.clone_from(self.repo_url, self.repo_path, env={'GIT_SSH_COMMAND': self.ssh_cmd})
 
+    def run(self):
+        # Clone repo if need
+        self.clone_repo()
+
         # Init repo
-        logging.info('Init repo %s' % self.repo_path)
+        logger.info('Init repo %s' % self.repo_path)
         repo = Repo.init(self.repo_path)
 
         # Set old version
         self.old_version = repo.git.describe('--always')
 
-        # Generate tags map
-        self.tags_map = dict(map(lambda x: (x.commit, x), repo.tags))
-
         # Fetch origin
-        logging.info('Fetch remote %s' % self.repo_url)
+        logger.info('Fetch remote %s' % self.repo_url)
         with repo.git.custom_environment(GIT_SSH_COMMAND=self.ssh_cmd):
             repo.remotes.origin.fetch(['--tags', '-f'])
 
@@ -264,6 +278,7 @@ class BotCi:
                 self.error('Missing origin/%s' % self.branch)
 
         # Find last tag on branch
+        self.tags_map = dict(map(lambda x: (x.commit, x), repo.tags))
         self.last_tag = self.get_last_tag(self.remote_commit.commit)
 
         # Go to last tag
@@ -274,7 +289,7 @@ class BotCi:
             # Set author name
             self.author = self.last_tag.tag.object.author.name
 
-            if self.last_tag.tag.object != repo.head.commit:
+            if self.last_tag.tag.object != repo.head.commit or self.force:
                 # Go to last tag
                 repo.head.reset(self.last_tag, index=True, working_tree=True)
 
@@ -289,17 +304,17 @@ class BotCi:
 
                 self.send_new_version_message()
             else:
-                logging.info('Repo up to date on %s' % self.version)
+                logger.info('Repo up to date on %s' % self.version)
         else:
-            logging.info('No tags on branch %s' % self.branch)
+            logger.info('No tags on branch %s' % self.branch)
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='Test and deploy a telegram bot.')
 
     parser.add_argument('-F', '--logging_format', nargs='?', type=str, default=None,
                         help='The format for Python logging')
-    parser.add_argument('-l', '--logging_level', nargs='?', type=str, default=None,
+    parser.add_argument('-l', '--logging_level', nargs='?', type=int, default=None,
                         help='The level for Python logging')
     parser.add_argument('-f', '--logging_filename', nargs='?', type=str, default=None,
                         help='The filename for Python logging')
@@ -327,6 +342,8 @@ if __name__ == '__main__':
     parser.add_argument('-P', '--pid_file_path', nargs='?', type=str, default=None,
                         help='The path to the PID file')
 
+    parser.add_argument('-E', '--python_executable', nargs='?', type=str, default=None,
+                        help='The Python executable')
     parser.add_argument('-v', '--virtualenv_path', nargs='?', type=str, default=None,
                         help='The path to the Python virtualenv')
     parser.add_argument('-C', '--create_virtualenv', nargs='?', type=str, default=None,
@@ -345,21 +362,20 @@ if __name__ == '__main__':
     parser.add_argument('-R', '--run_bot', nargs='?', type=str, default=None,
                         help='The command used in order to run the bot')
 
-    args = {k: v for k, v in vars(parser.parse_args()).items() if v is not None}
+    args = read_environments()
+    args.update({k: v for k, v in vars(parser.parse_args()).items() if v is not None})
 
     # Set logging
-    logging_format = args.pop('logging_format', None) or LOGGING_FORMAT or '%(asctime)s - %(levelname)s - %(message)s'
-    logging_level = args.pop('logging_level', None) or LOGGING_LEVEL or logging.INFO
-    logging_filename = args.pop('logging_filename', None) or LOGGING_FILENAME
+    logging_format = args.pop('logging_format')
+    logging_level = args.pop('logging_level')
+    logging_filename = args.pop('logging_filename')
 
     logging.basicConfig(
         filename=logging_filename,
         format=logging_format,
         level=logging_level,
     )
-    logger = logging.getLogger(__name__)
 
     # Start CI
     bot_cd = BotCi(**args)
     bot_cd.run()
-

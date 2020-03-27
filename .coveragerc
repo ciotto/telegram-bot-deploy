@@ -1,0 +1,5 @@
+[run]
+include = bot/*
+omit = *test_*, *__main__.py
+# see <https://lautaportti.wordpress.com/2011/05/07/test-coverage-analysis/>
+branch = True
