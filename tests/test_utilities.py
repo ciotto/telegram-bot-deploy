@@ -1,13 +1,22 @@
 import os
+import sys
 import unittest
-from unittest import mock
 
 import telegram
 
 from bot_ci.utilities import get_parse_array, send, getenv
 
+if sys.version_info[0] < 3:
+    import mock
+else:
+    from unittest import mock
+
 
 class TestUtilities(unittest.TestCase):
+    if sys.version_info[0] < 3:
+        def assertCountEqual(self, *args, **kwargs):
+            self.assertItemsEqual(*args, **kwargs)
+
     def setUp(self):
         with mock.patch.object(telegram.Bot, '_validate_token') as _validate_token_mock:
             self.bot = telegram.Bot('token')

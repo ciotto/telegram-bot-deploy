@@ -7,7 +7,6 @@ import random
 import sys
 import unittest
 import uuid
-from unittest import mock
 
 import telegram
 import tempfile
@@ -15,14 +14,19 @@ from git import Repo
 
 from bot_ci import main, BotCi, read_environments
 
+if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] < 6):
+    import mock
+else:
+    from unittest import mock
 
-class FakeAuthor:
+
+class FakeAuthor(object):
     def __init__(self, name=None, email=None):
         self.name = name or 'foo'
         self.author = email or 'bar@asd.com'
 
 
-class FakeObject:
+class FakeObject(object):
     def __init__(self, hexsha=None):
         self.hexsha = hexsha or uuid.uuid4().hex
 
@@ -32,12 +36,12 @@ class FakeObject:
 
 class FakeCommit(FakeObject):
     def __init__(self, parents=None, author=None, **kwargs):
-        super().__init__(**kwargs)
+        super(FakeCommit, self).__init__(**kwargs)
         self.parents = parents or []
         self.author = author or FakeAuthor()
 
 
-class FakeRef:
+class FakeRef(object):
     def __init__(self, object, path):
         self.object = object
         self.path = path
@@ -56,7 +60,7 @@ class FakeRef:
 
 class FakeTagRef(FakeRef):
     def __init__(self, object, *args, **kwargs):
-        super().__init__(object, *args, **kwargs)
+        super(FakeTagRef, self).__init__(object, *args, **kwargs)
 
         self.object = FakeTag(object, self.name)
 
@@ -71,6 +75,7 @@ class FakeTagRef(FakeRef):
 
 class FakeTag(FakeObject):
     def __init__(self, object, tag):
+        super(FakeTag, self).__init__()
         self.object = object
         self.tag = tag
 

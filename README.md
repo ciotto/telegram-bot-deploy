@@ -1,5 +1,12 @@
 # telegram-bot-deploy
 
+[![build](https://travis-ci.org/ciotto/telegram-bot-deploy.svg?branch=master)](https://travis-ci.org/ciotto/telegram-bot-deploy)
+[![coverage](https://img.shields.io/codecov/c/gh/ciotto/telegram-bot-deploy)](https://codecov.io/gh/ciotto/telegram-bot-deploy)
+[![Py Versions](https://img.shields.io/pypi/pyversions/telegram-bot-deploy)](https://pypi.python.org/pypi/telegram-bot-deploy/)
+[![license](https://img.shields.io/github/license/ciotto/telegram-bot-deploy)](https://pypi.python.org/pypi/telegram-bot-deploy/)
+[![status](https://img.shields.io/pypi/status/telegram-bot-deploy)](https://pypi.python.org/pypi/input-mocker/)
+[![PEP8](https://img.shields.io/badge/code%20style-pep8-orange)](https://www.python.org/dev/peps/pep-0008/)
+
 **telegram-bot-deploy** is *simple* and *easy-to-use* script that perform continuous deployment for the **Telegram bots**.
 
 ## Installation
