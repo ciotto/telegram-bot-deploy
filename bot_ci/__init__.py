@@ -183,22 +183,24 @@ class BotCi:
             if self.virtualenv_path and not os.path.exists(self.virtualenv_path):
                 logger.info('Create virtualenv: %s' % ' '.join(self.create_virtualenv))
                 process = subprocess.Popen(self.create_virtualenv, cwd=self.repo_path)
-                process.wait()
+                return process.wait()
             else:
                 logger.info('Virtualenv %s already exist' % self.virtualenv_path)
+        return 0
 
     def call_install_requirements(self):
         """Install requirements"""
         logger.info('Install requirements: %s' % ' '.join(self.install_requirements))
         process = subprocess.Popen(self.install_requirements, cwd=self.repo_path)
-        process.wait()
+        return process.wait()
 
     def call_run_tests(self):
         """Run tests"""
         if not self.skip_tests:
             logger.info('Run tests %s' % ' '.join(self.run_tests))
             process = subprocess.Popen(self.run_tests, cwd=self.repo_path)
-            process.wait()
+            return process.wait()
+        return 0
 
     def stop_bot(self):
         """Stop running bot"""
@@ -211,6 +213,7 @@ class BotCi:
                 os.kill(pid, signal.SIGTERM)
             except OSError:
                 logger.info('Process already stopped')
+        return 0
 
     def start_bot(self):
         """Start the bot"""
@@ -223,11 +226,11 @@ class BotCi:
         logger.info('Save pid %s' % self.pid)
         with open(self.pid_file_path, 'w') as f:
             f.write(str(self.pid))
+        return 0
 
     def restart_bot(self):
         """Stop and restart the bot"""
-        self.stop_bot()
-        self.start_bot()
+        return self.stop_bot() or self.start_bot()
 
     def send_message(self, msg):
         """Send a message"""
@@ -253,6 +256,22 @@ class BotCi:
         if self.is_new_repo:
             logger.info('Clone repo %s to %s' % (self.repo_url, self.repo_path))
             Repo.clone_from(self.repo_url, self.repo_path, env={'GIT_SSH_COMMAND': self.ssh_cmd})
+
+    def release_flow(self):
+        # Release
+        if self.call_create_virtualenv():
+            self.error('Virtualenv not created')
+
+        if self.call_install_requirements():
+            self.error('Requirements not installed')
+
+        if self.call_run_tests():
+            self.error('Test error')
+
+        if self.restart_bot():
+            self.error('Bot not restared')
+
+        self.send_new_version_message()
 
     def run(self):
         # Clone repo if need
@@ -293,16 +312,7 @@ class BotCi:
                 # Go to last tag
                 repo.head.reset(self.last_tag, index=True, working_tree=True)
 
-                # Release
-                self.call_create_virtualenv()
-
-                self.call_install_requirements()
-
-                self.call_run_tests()
-
-                self.restart_bot()
-
-                self.send_new_version_message()
+                self.release_flow()
             else:
                 logger.info('Repo up to date on %s' % self.version)
         else:

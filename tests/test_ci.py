@@ -135,7 +135,7 @@ class TestCI(unittest.TestCase):
 
     def test_init_read_environments(self):
         with mock.patch('bot_ci.load_dotenv') as load_dotenv_mock, \
-             mock.patch.object(BotCi, 'check') as check_mock:
+                mock.patch.object(BotCi, 'check') as check_mock:
             bot_ci = BotCi(**read_environments())
 
             self.assertEqual(bot_ci.repo_url, None)
@@ -179,7 +179,7 @@ class TestCI(unittest.TestCase):
 
     def test_init_args(self):
         with mock.patch('bot_ci.load_dotenv') as load_dotenv_mock, \
-             mock.patch.object(BotCi, 'check') as check_mock:
+                mock.patch.object(BotCi, 'check') as check_mock:
             args = read_environments()
             args.update(dict(
                 create_virtualenv='python3 -m venv .virtualenv',
@@ -289,7 +289,7 @@ class TestCI(unittest.TestCase):
         bot_ci = BotCi()
 
         with mock.patch('bot_ci.logger.error') as error_mock, \
-             mock.patch('os._exit') as _exit_mock:
+                mock.patch('os._exit') as _exit_mock:
             bot_ci.error('My message')
 
             error_mock.assert_called_once_with('My message')
@@ -300,7 +300,7 @@ class TestCI(unittest.TestCase):
         bot_ci = BotCi()
 
         with mock.patch('bot_ci.logger.error') as error_mock, \
-             mock.patch('os._exit') as _exit_mock:
+                mock.patch('os._exit') as _exit_mock:
             bot_ci.error('My message', code=42)
 
             error_mock.assert_called_once_with('My message')
@@ -366,60 +366,110 @@ class TestCI(unittest.TestCase):
     def test_call_create_virtualenv(self, *args):
         bot_ci = BotCi(virtualenv_path=get_random_path())
 
-        with mock.patch('subprocess.Popen') as popen_mock:
-            bot_ci.call_create_virtualenv()
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_create_virtualenv(), 0)
 
             popen_mock.assert_called_once_with(bot_ci.create_virtualenv, cwd=bot_ci.repo_path)
-            popen_mock.wait.assert_not_called()
+            popen.wait.assert_called_once_with()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_call_create_virtualenv_error(self, *args):
+        bot_ci = BotCi(virtualenv_path=get_random_path())
+
+        popen = mock.Mock()
+        popen.wait.return_value = 1
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_create_virtualenv(), 1)
+
+            popen_mock.assert_called_once_with(bot_ci.create_virtualenv, cwd=bot_ci.repo_path)
+            popen.wait.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
     def test_call_create_virtualenv_exists(self, *args):
         bot_ci = BotCi(virtualenv_path=get_random_path())
         os.mkdir(bot_ci.virtualenv_path)
 
-        with mock.patch('subprocess.Popen') as popen_mock:
-            bot_ci.call_create_virtualenv()
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_create_virtualenv(), 0)
 
             popen_mock.assert_not_called()
-            popen_mock.wait.assert_not_called()
+            popen.wait.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_call_create_virtualenv_no_virtualenv(self, *args):
         bot_ci = BotCi()
 
-        with mock.patch('subprocess.Popen') as popen_mock:
-            bot_ci.call_create_virtualenv()
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_create_virtualenv(), 0)
 
             popen_mock.assert_not_called()
+            popen.wait.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_call_install_requirements(self, *args):
         bot_ci = BotCi()
 
-        with mock.patch('subprocess.Popen') as popen_mock:
-            bot_ci.call_install_requirements()
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_install_requirements(), 0)
 
             popen_mock.assert_called_once_with(bot_ci.install_requirements, cwd=bot_ci.repo_path)
-            popen_mock.wait.assert_not_called()
+            popen.wait.assert_called_once_with()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_call_install_requirements_error(self, *args):
+        bot_ci = BotCi()
+
+        popen = mock.Mock()
+        popen.wait.return_value = 1
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_install_requirements(), 1)
+
+            popen_mock.assert_called_once_with(bot_ci.install_requirements, cwd=bot_ci.repo_path)
+            popen.wait.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
     def test_call_run_tests(self, *args):
-        bot_ci = BotCi()
+        bot_ci = BotCi(skip_tests=False)
 
-        with mock.patch('subprocess.Popen') as popen_mock:
-            bot_ci.call_run_tests()
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertFalse(bot_ci.call_run_tests())
 
             popen_mock.assert_called_once_with(bot_ci.run_tests, cwd=bot_ci.repo_path)
-            popen_mock.wait.assert_not_called()
+            popen.wait.assert_called_once_with()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_call_run_tests_error(self, *args):
+        bot_ci = BotCi(skip_tests=False)
+
+        popen = mock.Mock()
+        popen.wait.return_value = 1
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_run_tests(), 1)
+
+            popen_mock.assert_called_once_with(bot_ci.run_tests, cwd=bot_ci.repo_path)
+            popen.wait.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
     def test_call_run_tests_skip(self, *args):
         bot_ci = BotCi(skip_tests=True)
 
-        with mock.patch('subprocess.Popen') as popen_mock:
-            bot_ci.call_run_tests()
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertFalse(bot_ci.call_run_tests())
 
             popen_mock.assert_not_called()
+            popen.wait.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_stop_bot(self, *args):
@@ -462,18 +512,28 @@ class TestCI(unittest.TestCase):
             self.assertTrue(os.path.exists(bot_ci.pid_file_path))
 
             popen_mock.assert_called_once_with(bot_ci.run_bot, cwd=bot_ci.repo_path)
-            popen_mock.wait.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_restart_bot(self, *args):
         bot_ci = BotCi(pid_file_path=get_random_path())
 
-        with mock.patch.object(BotCi, 'stop_bot') as stop_bot_mock,\
-             mock.patch.object(BotCi, 'start_bot') as start_bot_mock:
-            bot_ci.restart_bot()
+        with mock.patch.object(BotCi, 'stop_bot', return_value=0) as stop_bot_mock, \
+                mock.patch.object(BotCi, 'start_bot', return_value=0) as start_bot_mock:
+            self.assertFalse(bot_ci.restart_bot())
 
             stop_bot_mock.assert_called_once_with()
             start_bot_mock.assert_called_once_with()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_restart_bot_error(self, *args):
+        bot_ci = BotCi(pid_file_path=get_random_path())
+
+        with mock.patch.object(BotCi, 'stop_bot', return_value=1) as stop_bot_mock, \
+                mock.patch.object(BotCi, 'start_bot', return_value=0) as start_bot_mock:
+            self.assertTrue(bot_ci.restart_bot())
+
+            stop_bot_mock.assert_called_once_with()
+            start_bot_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     @mock.patch.object(telegram.Bot, '_validate_token')
@@ -543,6 +603,133 @@ class TestCI(unittest.TestCase):
             clone_from_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
+    def test_release_flow(self, *args):
+        def error(msg):
+            self.fail('error() method called: %s' % msg)
+
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+
+        with mock.patch.object(bot_ci, 'error', side_effect=error), \
+                mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
+                mock.patch.object(bot_ci, 'call_install_requirements',
+                                  return_value=0) as call_install_requirements_mock, \
+                mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+
+            try:
+                bot_ci.release_flow()
+            except SystemExit:
+                pass
+
+            # Check methods calls
+            call_create_virtualenv_mock.assert_called_once_with()
+            call_install_requirements_mock.assert_called_once_with()
+            call_run_tests_mock.assert_called_once_with()
+            restart_bot_mock.assert_called_once_with()
+            send_new_version_message_mock.assert_called_once_with()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_release_flow_fail_create_virtualenv(self, *args):
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+
+        with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
+                mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=1) as call_create_virtualenv_mock, \
+                mock.patch.object(bot_ci, 'call_install_requirements',
+                                  return_value=0) as call_install_requirements_mock, \
+                mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+
+            try:
+                bot_ci.release_flow()
+            except SystemExit:
+                pass
+
+            # Check methods calls
+            error_mock.assert_called_once()
+            call_create_virtualenv_mock.assert_called_once_with()
+            call_install_requirements_mock.assert_not_called()
+            call_run_tests_mock.assert_not_called()
+            restart_bot_mock.assert_not_called()
+            send_new_version_message_mock.assert_not_called()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_release_flow_fail_install_requirements(self, *args):
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+
+        with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
+                mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
+                mock.patch.object(bot_ci, 'call_install_requirements',
+                                  return_value=1) as call_install_requirements_mock, \
+                mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+
+            try:
+                bot_ci.release_flow()
+            except SystemExit:
+                pass
+
+            # Check methods calls
+            error_mock.assert_called_once()
+            call_create_virtualenv_mock.assert_called_once_with()
+            call_install_requirements_mock.assert_called_once_with()
+            call_run_tests_mock.assert_not_called()
+            restart_bot_mock.assert_not_called()
+            send_new_version_message_mock.assert_not_called()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_release_flow_fail_run_tests(self, *args):
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+
+        with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
+                mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
+                mock.patch.object(bot_ci, 'call_install_requirements',
+                                  return_value=0) as call_install_requirements_mock, \
+                mock.patch.object(bot_ci, 'call_run_tests', return_value=1) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+
+            try:
+                bot_ci.release_flow()
+            except SystemExit:
+                pass
+
+            # Check methods calls
+            error_mock.assert_called_once()
+            call_create_virtualenv_mock.assert_called_once_with()
+            call_install_requirements_mock.assert_called_once_with()
+            call_run_tests_mock.assert_called_once_with()
+            restart_bot_mock.assert_not_called()
+            send_new_version_message_mock.assert_not_called()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_release_flow_fail_restart_bot(self, *args):
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+
+        with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
+                mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
+                mock.patch.object(bot_ci, 'call_install_requirements',
+                                  return_value=0) as call_install_requirements_mock, \
+                mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'restart_bot', return_value=1) as restart_bot_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+
+            try:
+                bot_ci.release_flow()
+            except SystemExit:
+                pass
+
+            # Check methods calls
+            error_mock.assert_called_once()
+            call_create_virtualenv_mock.assert_called_once_with()
+            call_install_requirements_mock.assert_called_once_with()
+            call_run_tests_mock.assert_called_once_with()
+            restart_bot_mock.assert_called_once_with()
+            send_new_version_message_mock.assert_not_called()
+
+    @mock.patch.object(BotCi, 'check')
     def test_run(self, *args):
         def error(msg):
             self.fail('error() method called: %s' % msg)
@@ -574,11 +761,7 @@ class TestCI(unittest.TestCase):
         with mock.patch.object(bot_ci, 'clone_repo') as clone_repo_mock, \
                 mock.patch.object(bot_ci, 'error', side_effect=error), \
                 mock.patch.object(bot_ci, 'get_last_tag', return_value=tagv2) as get_last_tag_mock, \
-                mock.patch.object(bot_ci, 'call_create_virtualenv') as call_create_virtualenv_mock, \
-                mock.patch.object(bot_ci, 'call_install_requirements') as call_install_requirements_mock, \
-                mock.patch.object(bot_ci, 'call_run_tests') as call_run_tests_mock, \
-                mock.patch.object(bot_ci, 'restart_bot') as restart_bot_mock, \
-                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock, \
+                mock.patch.object(bot_ci, 'release_flow') as release_flow_mock, \
                 mock.patch.object(Repo, 'init', return_value=repo) as init_mock:
 
             try:
@@ -601,11 +784,7 @@ class TestCI(unittest.TestCase):
             tags.assert_called_once_with()
             get_last_tag_mock.assert_called_once_with(c3)
             repo.head.reset.assert_called_once_with(tagv2, index=True, working_tree=True)
-            call_create_virtualenv_mock.assert_called_once_with()
-            call_install_requirements_mock.assert_called_once_with()
-            call_run_tests_mock.assert_called_once_with()
-            restart_bot_mock.assert_called_once_with()
-            send_new_version_message_mock.assert_called_once_with()
+            release_flow_mock.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
     def test_run_missing_branch(self, *args):
@@ -748,11 +927,10 @@ class TestCI(unittest.TestCase):
 
     def test_main(self):
         with mock.patch('bot_ci.load_dotenv') as load_dotenv_mock, \
-             mock.patch('logging.basicConfig') as basicConfig_mock, \
-             mock.patch.object(sys, 'argv', ['capitalismo_bot.py']), \
-             mock.patch.object(BotCi, 'check') as check_mock, \
-             mock.patch.object(BotCi, 'run') as run_mock:
-
+                mock.patch('logging.basicConfig') as basicConfig_mock, \
+                mock.patch.object(sys, 'argv', ['capitalismo_bot.py']), \
+                mock.patch.object(BotCi, 'check') as check_mock, \
+                mock.patch.object(BotCi, 'run') as run_mock:
             main()
 
             basicConfig_mock.assert_called_once_with(
