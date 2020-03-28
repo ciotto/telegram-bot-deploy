@@ -28,7 +28,27 @@ def read_environments():
 
         chat_id=getenv('CHAT_ID', parser=int),
         bot_token=getenv('BOT_TOKEN'),
-        msg_text=getenv('MSG_TEXT', "I'm at new version %(version)s!"),
+
+        msg_create_virtualenv_fail=getenv(
+            'MSG_CREATE_VIRTUALENV_FAIL',
+            "Error during virtualenv creation for version %(version)s!"
+        ),
+        msg_install_requirements_fail=getenv(
+            'MSG_INSTALL_REQUIREMENTS_FAIL',
+            "Error during install requirements for version %(version)s!"
+        ),
+        msg_run_tests_fail=getenv(
+            'MSG_RUN_TESTS_FAIL',
+            "Error during tests run for version %(version)s!"
+        ),
+        msg_restart_fail=getenv(
+            'MSG_RESTART_FAIL',
+            "Error during bot restart for version %(version)s!"
+        ),
+        msg_new_version=getenv(
+            'MSG_NEW_VERSION',
+            "I'm at new version %(version)s!"
+        ),
 
         pid_file_path=getenv('PID_FILE_PATH'),
 
@@ -62,7 +82,12 @@ class BotCi:
 
         chat_id=None,
         bot_token=None,
-        msg_text=None,
+
+        msg_create_virtualenv_fail=None,
+        msg_install_requirements_fail=None,
+        msg_run_tests_fail=None,
+        msg_restart_fail=None,
+        msg_new_version=None,
 
         pid_file_path=None,
 
@@ -94,7 +119,12 @@ class BotCi:
         self.bot = None
         if self.bot_token:
             self.bot = telegram.Bot(self.bot_token)
-        self.msg_text = msg_text
+
+        self.msg_create_virtualenv_fail = msg_create_virtualenv_fail
+        self.msg_install_requirements_fail = msg_install_requirements_fail
+        self.msg_run_tests_fail = msg_run_tests_fail
+        self.msg_restart_fail = msg_restart_fail
+        self.msg_new_version = msg_new_version
 
         # pid file
         self.pid_file_path = pid_file_path or os.path.join(self.repo_path, '.pid')
@@ -242,14 +272,38 @@ class BotCi:
             )
         else:
             logger.info('Bot token or chat_id not configured')
-
-    def send_new_version_message(self):
-        """Send a message when new version was deployed"""
-        self.send_message(self.msg_text % {
+    
+    def get_context(self):
+        return {
                 'old_version': self.old_version,
                 'version': self.version,
                 'author': self.author,
-        })
+        }
+
+    def send_create_virtualenv_fail_message(self):
+        """Send a message when create virtualenv fail"""
+        if self.msg_create_virtualenv_fail:
+            self.send_message(self.msg_create_virtualenv_fail % self.get_context())
+        
+    def send_install_requirements_fail_message(self):
+        """Send a message when install requirements fail"""
+        if self.msg_install_requirements_fail:
+            self.send_message(self.msg_install_requirements_fail % self.get_context())
+        
+    def send_run_tests_fail_message(self):
+        """Send a message when run tests fail"""
+        if self.msg_run_tests_fail:
+            self.send_message(self.msg_run_tests_fail % self.get_context())
+        
+    def send_restart_fail_message(self):
+        """Send a message when bot restart fail"""
+        if self.msg_restart_fail:
+            self.send_message(self.msg_restart_fail % self.get_context())
+
+    def send_new_version_message(self):
+        """Send a message when new version was deployed"""
+        if self.msg_new_version:
+            self.send_message(self.msg_new_version % self.get_context())
 
     def clone_repo(self):
         """Clone repo if need"""
@@ -260,15 +314,19 @@ class BotCi:
     def release_flow(self):
         # Release
         if self.call_create_virtualenv():
+            self.send_create_virtualenv_fail_message()
             self.error('Virtualenv not created')
 
         if self.call_install_requirements():
+            self.send_install_requirements_fail_message()
             self.error('Requirements not installed')
 
         if self.call_run_tests():
+            self.send_run_tests_fail_message()
             self.error('Test error')
 
         if self.restart_bot():
+            self.send_restart_fail_message()
             self.error('Bot not restared')
 
         self.send_new_version_message()
@@ -346,8 +404,6 @@ def main():
                         help='The chat ID used for bot communication')
     parser.add_argument('-t', '--bot_token', nargs='?', type=str, default=None,
                         help='The bot token used for bot communication')
-    parser.add_argument('-m', '--msg_text', nargs='?', type=str, default=None,
-                        help='The message that will be sent after update')
 
     parser.add_argument('-P', '--pid_file_path', nargs='?', type=str, default=None,
                         help='The path to the PID file')

@@ -105,7 +105,11 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.chat_id, None)
             self.assertEqual(bot_ci.bot_token, None)
             self.assertIsNone(bot_ci.bot)
-            self.assertEqual(bot_ci.msg_text, None)
+            self.assertEqual(bot_ci.msg_create_virtualenv_fail, None)
+            self.assertEqual(bot_ci.msg_install_requirements_fail, None)
+            self.assertEqual(bot_ci.msg_run_tests_fail, None)
+            self.assertEqual(bot_ci.msg_restart_fail, None)
+            self.assertEqual(bot_ci.msg_new_version, None)
             self.assertEqual(bot_ci.pid_file_path, os.path.join('repo', '.pid'))
             self.assertEqual(bot_ci.force, False)
             self.assertEqual(bot_ci.python_executable, 'python3')
@@ -146,7 +150,26 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.chat_id, None)
             self.assertEqual(bot_ci.bot_token, None)
             self.assertIsNone(bot_ci.bot)
-            self.assertEqual(bot_ci.msg_text, "I'm at new version %(version)s!")
+            self.assertEqual(
+                bot_ci.msg_create_virtualenv_fail,
+                "Error during virtualenv creation for version %(version)s!"
+            )
+            self.assertEqual(
+                bot_ci.msg_install_requirements_fail,
+                "Error during install requirements for version %(version)s!"
+            )
+            self.assertEqual(
+                bot_ci.msg_run_tests_fail,
+                "Error during tests run for version %(version)s!"
+            )
+            self.assertEqual(
+                bot_ci.msg_restart_fail,
+                "Error during bot restart for version %(version)s!"
+            )
+            self.assertEqual(
+                bot_ci.msg_new_version,
+                "I'm at new version %(version)s!"
+            )
             self.assertEqual(bot_ci.pid_file_path, os.path.join('repo', '.pid'))
             self.assertEqual(bot_ci.force, False)
             self.assertEqual(bot_ci.python_executable, 'python3')
@@ -197,7 +220,26 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.chat_id, None)
             self.assertEqual(bot_ci.bot_token, None)
             self.assertIsNone(bot_ci.bot)
-            self.assertEqual(bot_ci.msg_text, "I'm at new version %(version)s!")
+            self.assertEqual(
+                bot_ci.msg_create_virtualenv_fail,
+                "Error during virtualenv creation for version %(version)s!"
+            )
+            self.assertEqual(
+                bot_ci.msg_install_requirements_fail,
+                "Error during install requirements for version %(version)s!"
+            )
+            self.assertEqual(
+                bot_ci.msg_run_tests_fail,
+                "Error during tests run for version %(version)s!"
+            )
+            self.assertEqual(
+                bot_ci.msg_restart_fail,
+                "Error during bot restart for version %(version)s!"
+            )
+            self.assertEqual(
+                bot_ci.msg_new_version,
+                "I'm at new version %(version)s!"
+            )
             self.assertEqual(bot_ci.pid_file_path, os.path.join('repo', '.pid'))
             self.assertEqual(bot_ci.force, False)
             self.assertEqual(bot_ci.python_executable, 'python3')
@@ -237,7 +279,11 @@ class TestCI(unittest.TestCase):
                 ssh_key='/etc/my_ssh_key',
                 chat_id=-123123,
                 bot_token='111111111:AAA-AA-AAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-                msg_text='Version %(version)s!',
+                msg_create_virtualenv_fail='Version %(version)s!',
+                msg_install_requirements_fail='Version %(version)s!',
+                msg_run_tests_fail='Version %(version)s!',
+                msg_restart_fail='Version %(version)s!',
+                msg_new_version='Version %(version)s!',
                 pid_file_path='mypidfile',
                 force=True,
                 python_executable='/usr/local/bin/python2.7',
@@ -254,7 +300,11 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.chat_id, -123123)
             self.assertEqual(bot_ci.bot_token, '111111111:AAA-AA-AAAAAAAAAAAAAAAAAAAAAAAAAAAA')
             self.assertIsNotNone(bot_ci.bot)
-            self.assertEqual(bot_ci.msg_text, 'Version %(version)s!')
+            self.assertEqual(bot_ci.msg_create_virtualenv_fail, 'Version %(version)s!')
+            self.assertEqual(bot_ci.msg_install_requirements_fail, 'Version %(version)s!')
+            self.assertEqual(bot_ci.msg_run_tests_fail, 'Version %(version)s!')
+            self.assertEqual(bot_ci.msg_restart_fail, 'Version %(version)s!')
+            self.assertEqual(bot_ci.msg_new_version, 'Version %(version)s!')
             self.assertEqual(bot_ci.pid_file_path, 'mypidfile')
             self.assertEqual(bot_ci.force, True)
             self.assertEqual(bot_ci.python_executable, '/usr/local/bin/python2.7')
@@ -565,8 +615,72 @@ class TestCI(unittest.TestCase):
             send_message_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
+    def test_get_context(self, *args):
+        bot_ci = BotCi()
+        bot_ci.old_version = 'v1.0'
+        bot_ci.version = 'v2.0'
+        bot_ci.author = 'the author'
+
+        self.assertEqual(
+            bot_ci.get_context(),
+            dict(
+                old_version='v1.0',
+                version='v2.0',
+                author='the author',
+            )
+        )
+
+    @mock.patch.object(BotCi, 'check')
+    def test_send_create_virtualenv_fail_message(self, *args):
+        bot_ci = BotCi(msg_create_virtualenv_fail='Version %(version)s by %(author)s, old version %(old_version)s')
+        bot_ci.old_version = 'v1.0'
+        bot_ci.version = 'v2.0'
+        bot_ci.author = 'the author'
+
+        with mock.patch.object(bot_ci, 'send_message') as send_message_mock:
+            bot_ci.send_create_virtualenv_fail_message()
+
+            send_message_mock.assert_called_once_with('Version v2.0 by the author, old version v1.0')
+
+    @mock.patch.object(BotCi, 'check')
+    def test_send_install_requirements_fail_message(self, *args):
+        bot_ci = BotCi(msg_install_requirements_fail='Version %(version)s by %(author)s, old version %(old_version)s')
+        bot_ci.old_version = 'v1.0'
+        bot_ci.version = 'v2.0'
+        bot_ci.author = 'the author'
+
+        with mock.patch.object(bot_ci, 'send_message') as send_message_mock:
+            bot_ci.send_install_requirements_fail_message()
+
+            send_message_mock.assert_called_once_with('Version v2.0 by the author, old version v1.0')
+
+    @mock.patch.object(BotCi, 'check')
+    def test_send_run_tests_fail_message(self, *args):
+        bot_ci = BotCi(msg_run_tests_fail='Version %(version)s by %(author)s, old version %(old_version)s')
+        bot_ci.old_version = 'v1.0'
+        bot_ci.version = 'v2.0'
+        bot_ci.author = 'the author'
+
+        with mock.patch.object(bot_ci, 'send_message') as send_message_mock:
+            bot_ci.send_run_tests_fail_message()
+
+            send_message_mock.assert_called_once_with('Version v2.0 by the author, old version v1.0')
+
+    @mock.patch.object(BotCi, 'check')
+    def test_send_restart_fail_message(self, *args):
+        bot_ci = BotCi(msg_restart_fail='Version %(version)s by %(author)s, old version %(old_version)s')
+        bot_ci.old_version = 'v1.0'
+        bot_ci.version = 'v2.0'
+        bot_ci.author = 'the author'
+
+        with mock.patch.object(bot_ci, 'send_message') as send_message_mock:
+            bot_ci.send_restart_fail_message()
+
+            send_message_mock.assert_called_once_with('Version v2.0 by the author, old version v1.0')
+
+    @mock.patch.object(BotCi, 'check')
     def test_send_new_version_message(self, *args):
-        bot_ci = BotCi(msg_text='Version %(version)s by %(author)s, old version %(old_version)s')
+        bot_ci = BotCi(msg_new_version='Version %(version)s by %(author)s, old version %(old_version)s')
         bot_ci.old_version = 'v1.0'
         bot_ci.version = 'v2.0'
         bot_ci.author = 'the author'
@@ -575,6 +689,19 @@ class TestCI(unittest.TestCase):
             bot_ci.send_new_version_message()
 
             send_message_mock.assert_called_once_with('Version v2.0 by the author, old version v1.0')
+
+    @mock.patch.object(BotCi, 'check')
+    def test_send_message_empty(self, *args):
+        bot_ci = BotCi()
+
+        with mock.patch.object(bot_ci, 'send_message') as send_message_mock:
+            bot_ci.send_create_virtualenv_fail_message()
+            bot_ci.send_install_requirements_fail_message()
+            bot_ci.send_run_tests_fail_message()
+            bot_ci.send_restart_fail_message()
+            bot_ci.send_new_version_message()
+
+            send_message_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_clone_repo(self, *args):
@@ -615,7 +742,16 @@ class TestCI(unittest.TestCase):
                                   return_value=0) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
-                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+                mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
+                                  ) as send_create_virtualenv_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_install_requirements_fail_message'
+                                  ) as send_install_requirements_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_run_tests_fail_message'
+                                  ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_restart_fail_message'
+                                  ) as send_restart_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message'
+                                  ) as send_new_version_message_mock:
 
             try:
                 bot_ci.release_flow()
@@ -627,6 +763,10 @@ class TestCI(unittest.TestCase):
             call_install_requirements_mock.assert_called_once_with()
             call_run_tests_mock.assert_called_once_with()
             restart_bot_mock.assert_called_once_with()
+            send_create_virtualenv_fail_message_mock.assert_not_called()
+            send_install_requirements_fail_message_mock.assert_not_called()
+            send_run_tests_fail_message_mock.assert_not_called()
+            send_restart_fail_message_mock.assert_not_called()
             send_new_version_message_mock.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
@@ -639,7 +779,16 @@ class TestCI(unittest.TestCase):
                                   return_value=0) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
-                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+                mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
+                                  ) as send_create_virtualenv_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_install_requirements_fail_message'
+                                  ) as send_install_requirements_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_run_tests_fail_message'
+                                  ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_restart_fail_message'
+                                  ) as send_restart_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message'
+                                  ) as send_new_version_message_mock:
 
             try:
                 bot_ci.release_flow()
@@ -652,6 +801,10 @@ class TestCI(unittest.TestCase):
             call_install_requirements_mock.assert_not_called()
             call_run_tests_mock.assert_not_called()
             restart_bot_mock.assert_not_called()
+            send_create_virtualenv_fail_message_mock.assert_called_once_with()
+            send_install_requirements_fail_message_mock.assert_not_called()
+            send_run_tests_fail_message_mock.assert_not_called()
+            send_restart_fail_message_mock.assert_not_called()
             send_new_version_message_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
@@ -664,7 +817,16 @@ class TestCI(unittest.TestCase):
                                   return_value=1) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
-                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+                mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
+                                  ) as send_create_virtualenv_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_install_requirements_fail_message'
+                                  ) as send_install_requirements_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_run_tests_fail_message'
+                                  ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_restart_fail_message'
+                                  ) as send_restart_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message'
+                                  ) as send_new_version_message_mock:
 
             try:
                 bot_ci.release_flow()
@@ -677,6 +839,10 @@ class TestCI(unittest.TestCase):
             call_install_requirements_mock.assert_called_once_with()
             call_run_tests_mock.assert_not_called()
             restart_bot_mock.assert_not_called()
+            send_create_virtualenv_fail_message_mock.assert_not_called()
+            send_install_requirements_fail_message_mock.assert_called_once_with()
+            send_run_tests_fail_message_mock.assert_not_called()
+            send_restart_fail_message_mock.assert_not_called()
             send_new_version_message_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
@@ -689,7 +855,16 @@ class TestCI(unittest.TestCase):
                                   return_value=0) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=1) as call_run_tests_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
-                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+                mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
+                                  ) as send_create_virtualenv_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_install_requirements_fail_message'
+                                  ) as send_install_requirements_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_run_tests_fail_message'
+                                  ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_restart_fail_message'
+                                  ) as send_restart_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message'
+                                  ) as send_new_version_message_mock:
 
             try:
                 bot_ci.release_flow()
@@ -702,6 +877,10 @@ class TestCI(unittest.TestCase):
             call_install_requirements_mock.assert_called_once_with()
             call_run_tests_mock.assert_called_once_with()
             restart_bot_mock.assert_not_called()
+            send_create_virtualenv_fail_message_mock.assert_not_called()
+            send_install_requirements_fail_message_mock.assert_not_called()
+            send_run_tests_fail_message_mock.assert_called_once_with()
+            send_restart_fail_message_mock.assert_not_called()
             send_new_version_message_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
@@ -714,7 +893,16 @@ class TestCI(unittest.TestCase):
                                   return_value=0) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=1) as restart_bot_mock, \
-                mock.patch.object(bot_ci, 'send_new_version_message') as send_new_version_message_mock:
+                mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
+                                  ) as send_create_virtualenv_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_install_requirements_fail_message'
+                                  ) as send_install_requirements_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_run_tests_fail_message'
+                                  ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_restart_fail_message'
+                                  ) as send_restart_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message'
+                                  ) as send_new_version_message_mock:
 
             try:
                 bot_ci.release_flow()
@@ -727,6 +915,10 @@ class TestCI(unittest.TestCase):
             call_install_requirements_mock.assert_called_once_with()
             call_run_tests_mock.assert_called_once_with()
             restart_bot_mock.assert_called_once_with()
+            send_create_virtualenv_fail_message_mock.assert_not_called()
+            send_install_requirements_fail_message_mock.assert_not_called()
+            send_run_tests_fail_message_mock.assert_not_called()
+            send_restart_fail_message_mock.assert_called_once_with()
             send_new_version_message_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')

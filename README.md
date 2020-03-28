@@ -37,7 +37,12 @@ The available variables are:
 
   - `CHAT_ID`: The local path of the repo
   - `BOT_TOKEN`: The branch used for deploy
-  - `MSG_TEXT`: Restart also same versions
+
+  - `MSG_CREATE_VIRTUALENV_FAIL`: Message that will be send when create virtualenv fail 
+  - `MSG_INSTALL_REQUIREMENTS_FAIL`: Message that will be send when install requirements fail 
+  - `MSG_RUN_TESTS_FAIL`: Message that will be send when run tests fail 
+  - `MSG_RESTART_FAIL`: Message that will be send when bot restart fail 
+  - `MSG_NEW_VERSION`: Message that will be send when new version was deployed 
 
   - `PID_FILE_PATH`: The SSH key to be used to authenticate to the repo
 
