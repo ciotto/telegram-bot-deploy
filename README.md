@@ -29,41 +29,41 @@ Is also possible to use environments variables or a `.env` file in order to set 
 
 The available variables are:
 
-  - `REPO_URL`: The format for Python logging
-  - `REPO_PATH`: The level for Python logging
-  - `BRANCH`: The filename for Python logging
+  - `REPO_URL`: The URL of the repo to be used
+  - `REPO_PATH`: The local path of the repo
+  - `BRANCH`: The branch used for deploy
 
-  - `SSH_KEY`: The URL of the repo to be used
+  - `SSH_KEY`: The SSH key to be used to authenticate to the repo
 
-  - `CHAT_ID`: The local path of the repo
-  - `BOT_TOKEN`: The branch used for deploy
+  - `CHAT_ID`: The chat ID used for bot communication
+  - `BOT_TOKEN`: The bot token used for bot communication
 
-  - `MSG_CREATE_VIRTUALENV_FAIL`: Message that will be send when create virtualenv fail 
-  - `MSG_INSTALL_REQUIREMENTS_FAIL`: Message that will be send when install requirements fail 
-  - `MSG_RUN_TESTS_FAIL`: Message that will be send when run tests fail 
-  - `MSG_RESTART_FAIL`: Message that will be send when bot restart fail 
-  - `MSG_NEW_VERSION`: Message that will be send when new version was deployed 
+  - `MSG_CREATE_VIRTUALENV_FAIL`: Message that will be send when create virtualenv fail
+  - `MSG_INSTALL_REQUIREMENTS_FAIL`: Message that will be send when install requirements fail
+  - `MSG_RUN_TESTS_FAIL`: Message that will be send when run tests fail
   - `MSG_COVERAGE_FAIL`: Message that will be send when get coverage fail
   - `MSG_COVERAGE_LOW`: Message that will be send when coverage is too low
+  - `MSG_RESTART_FAIL`: Message that will be send when bot restart fail
+  - `MSG_NEW_VERSION`: Message that will be send when new version was deployed
 
-  - `PID_FILE_PATH`: The SSH key to be used to authenticate to the repo
+  - `PID_FILE_PATH`: The path to the PID file
 
-  - `PYTHON_EXECUTABLE`: The chat ID used for bot communication
-  - `VIRTUALENV_PATH`: The bot token used for bot communication
-  - `CREATE_VIRTUALENV`: The message that will be sent after update
+  - `PYTHON_EXECUTABLE`: The Python executable
+  - `VIRTUALENV_PATH`: The path to the Python virtualenv
+  - `CREATE_VIRTUALENV`: The command used in order to create the Python virtualenv
 
-  - `REQUIREMENTS_PATH`: The path to the PID file
-  - `INSTALL_REQUIREMENTS`: The Python executable
+  - `REQUIREMENTS_PATH`: The path to the requirements file
+  - `INSTALL_REQUIREMENTS`: The command used in order to install the requirements
 
-  - `RUN_TESTS`: The path to the Python virtualenv
+  - `RUN_TESTS`: The command used in order to run the tests
   - `MIN_COVERAGE`: The minimal coverage required in order to deploy
   - `GET_COVERAGE_PERCENTAGE`: The command used in order to get the coverage percentage value
 
-  - `RUN_BOT`: The command used in order to create the Python virtualenv
+  - `RUN_BOT`: The command used in order to run the bot
 
-  - `LOGGING_FORMAT`: The path to the requirements file
-  - `LOGGING_LEVEL`: The command used in order to install the requirements
-  - `LOGGING_FILENAME`: The command used in order to run the tests 
+  - `LOGGING_FORMAT`: The format for Python logging
+  - `LOGGING_LEVEL`: The level for Python logging
+  - `LOGGING_FILENAME`: The filename for Python logging 
 
 ## How to contribute
 
