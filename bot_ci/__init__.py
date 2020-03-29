@@ -154,36 +154,32 @@ class BotCi:
         self.bin_path = os.path.join(self.virtualenv_path, 'bin') if self.virtualenv_path else None
         self.create_virtualenv = None
         if create_virtualenv:
-            self.create_virtualenv = create_virtualenv.split(' ')
+            self.create_virtualenv = create_virtualenv
         elif self.virtualenv_path:
-            self.create_virtualenv = [
-                'virtualenv', self.virtualenv_path, '--no-site-packages', '-p', self.python_executable
-            ]
+            self.create_virtualenv = 'virtualenv %s --no-site-packages -p %s' % (
+                self.virtualenv_path, self.python_executable
+            )
 
         # Requirements
         self.requirements_path = requirements_path or 'requirements.txt'
-        self.install_requirements = install_requirements.split(' ') if install_requirements else [
-            os.path.join(self.bin_path or '', 'pip'), 'install', '-r', self.requirements_path
-        ]
+        self.install_requirements = install_requirements if install_requirements else '%s install -r %s' % (
+            os.path.join(self.bin_path or '', 'pip'), self.requirements_path
+        )
 
         # Tests
-        self.run_tests = run_tests.split(' ') if run_tests else [
-            os.path.join(self.bin_path or '', 'pytest'), '--cov=bot'
-        ]
+        self.run_tests = run_tests if run_tests else '%s --cov=bot' % os.path.join(self.bin_path or '', 'pytest')
         self.skip_tests = skip_tests
 
         # Coverage percentage
-        self.get_coverage_percentage = get_coverage_percentage.split(' ') if get_coverage_percentage else [
-            os.path.join(self.bin_path or '', 'coverage'), "report", "|", "tail", "-1", "|", "awk", "'{print $(NF)}'",
-            "|", "sed", "'s/.$//'"
-        ]
+        self.get_coverage_percentage = get_coverage_percentage if get_coverage_percentage else (
+            '%s report | grep TOTAL | awk \'{print $(NF)}\' | sed \'s/.$//\'' %
+            os.path.join(self.bin_path or '', 'coverage')
+        )
         self.skip_coverage = skip_coverage
         self.min_coverage = min_coverage
 
         # Run
-        self.run_bot = run_bot.split(' ') if run_bot else [
-            os.path.join(self.bin_path or '', 'python'), 'bot.py'
-        ]
+        self.run_bot = run_bot if run_bot else '%s %s' % (os.path.join(self.bin_path or '', 'python'), 'bot.py')
 
         # True when local branch does not exist
         self.tags_map = {}
@@ -236,10 +232,10 @@ class BotCi:
 
     def call_create_virtualenv(self):
         """Create virtualenv if not exist"""
-        if self.create_virtualenv:
-            if self.virtualenv_path and not os.path.exists(self.virtualenv_path):
-                logger.info('Create virtualenv: %s' % ' '.join(self.create_virtualenv))
-                process = subprocess.Popen(self.create_virtualenv, cwd=self.repo_path)
+        if self.create_virtualenv and self.virtualenv_path:
+            if not os.path.exists(os.path.join(self.repo_path, self.virtualenv_path)):
+                logger.info('Create virtualenv: %s' % self.create_virtualenv)
+                process = subprocess.Popen(self.create_virtualenv, cwd=self.repo_path, shell=True)
                 return process.wait()
             else:
                 logger.info('Virtualenv %s already exist' % self.virtualenv_path)
@@ -247,24 +243,35 @@ class BotCi:
 
     def call_install_requirements(self):
         """Install requirements"""
-        logger.info('Install requirements: %s' % ' '.join(self.install_requirements))
-        process = subprocess.Popen(self.install_requirements, cwd=self.repo_path)
+        logger.info('Install requirements: %s' % self.install_requirements)
+        process = subprocess.Popen(self.install_requirements, cwd=self.repo_path, shell=True)
         return process.wait()
 
     def call_run_tests(self):
         """Run tests"""
         if not self.skip_tests:
-            logger.info('Run tests: %s' % ' '.join(self.run_tests))
-            process = subprocess.Popen(self.run_tests, cwd=self.repo_path)
+            logger.info('Run tests: %s' % self.run_tests)
+            process = subprocess.Popen(self.run_tests, cwd=self.repo_path, shell=True)
             return process.wait()
         return 0
 
     def call_get_coverage_percentage(self):
         """Get coverage percentage"""
         if not self.skip_tests and not self.skip_coverage:
-            logger.info('Run get coverage percentage: %s' % ' '.join(self.get_coverage_percentage))
-            process = subprocess.Popen(self.get_coverage_percentage, cwd=self.repo_path)
-            return process.wait()
+            logger.info('Run get coverage percentage: %s' % self.get_coverage_percentage)
+            process = subprocess.Popen(
+                self.get_coverage_percentage,
+                cwd=self.repo_path,
+                shell=True,
+                stdout=subprocess.PIPE,
+            )
+            returncode = process.wait()
+            if not returncode:
+                try:
+                    self.coverage = float(process.stdout.read())
+                except ValueError:
+                    return 'Invalid format'
+            return returncode
         return 0
 
     def stop_bot(self):
@@ -284,7 +291,7 @@ class BotCi:
         """Start the bot"""
         # Run bot
         logger.info('Run bot %s: %s' % (self.version, ' '.join(self.run_bot)))
-        process = subprocess.Popen(self.run_bot, cwd=self.repo_path)
+        process = subprocess.Popen(self.run_bot, cwd=self.repo_path, shell=True)
         self.pid = process.pid
 
         # Save pid

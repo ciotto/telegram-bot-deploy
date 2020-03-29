@@ -4,6 +4,7 @@ import logging
 import string
 import os
 import random
+import subprocess
 import sys
 import unittest
 import uuid
@@ -119,21 +120,16 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.bin_path, None)
             self.assertEqual(bot_ci.create_virtualenv, None)
             self.assertEqual(bot_ci.requirements_path, 'requirements.txt')
-            self.assertEqual(bot_ci.install_requirements, [
-                'pip', 'install', '-r', 'requirements.txt'
-            ])
-            self.assertEqual(bot_ci.run_tests, [
-                'pytest', '--cov=bot'
-            ])
+            self.assertEqual(bot_ci.install_requirements, 'pip install -r requirements.txt')
+            self.assertEqual(bot_ci.run_tests, 'pytest --cov=bot')
             self.assertEqual(bot_ci.skip_tests, False)
-            self.assertEqual(bot_ci.get_coverage_percentage, [
-                "coverage", "report", "|", "tail", "-1", "|", "awk", "'{print $(NF)}'", "|", "sed", "'s/.$//'"
-            ])
+            self.assertEqual(
+                bot_ci.get_coverage_percentage,
+                "coverage report | grep TOTAL | awk '{print $(NF)}' | sed 's/.$//'"
+            )
             self.assertEqual(bot_ci.skip_coverage, False)
             self.assertEqual(bot_ci.min_coverage, 0)
-            self.assertEqual(bot_ci.run_bot, [
-                'python', 'bot.py'
-            ])
+            self.assertEqual(bot_ci.run_bot, 'python bot.py')
             self.assertEqual(bot_ci.tags_map, {})
             self.assertEqual(bot_ci.pid, None)
             self.assertEqual(bot_ci.old_version, None)
@@ -191,26 +187,25 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.python_executable, 'python3')
             self.assertEqual(bot_ci.virtualenv_path, '.virtualenv')
             self.assertEqual(bot_ci.bin_path, os.path.join('.virtualenv', 'bin'))
-            self.assertEqual(bot_ci.create_virtualenv, [
-                'virtualenv', '.virtualenv', '--no-site-packages', '-p', 'python3'
-            ])
+            self.assertEqual(bot_ci.create_virtualenv, 'virtualenv .virtualenv --no-site-packages -p python3')
             self.assertEqual(bot_ci.requirements_path, 'requirements.txt')
-            self.assertEqual(bot_ci.install_requirements, [
-                os.path.join('.virtualenv', 'bin', 'pip'), 'install', '-r', 'requirements.txt'
-            ])
-            self.assertEqual(bot_ci.run_tests, [
-                os.path.join('.virtualenv', 'bin', 'pytest'), '--cov=bot'
-            ])
+            self.assertEqual(bot_ci.install_requirements, '%s install -r requirements.txt' % (
+                os.path.join('.virtualenv', 'bin', 'pip')
+            ))
+
+            self.assertEqual(bot_ci.run_tests, '%s --cov=bot' % os.path.join('.virtualenv', 'bin', 'pytest'))
             self.assertEqual(bot_ci.skip_tests, False)
-            self.assertEqual(bot_ci.get_coverage_percentage, [
-                os.path.join('.virtualenv', 'bin', 'coverage'), "report", "|", "tail", "-1", "|", "awk",
-                "'{print $(NF)}'", "|", "sed", "'s/.$//'"
-            ])
+            self.assertEqual(
+                bot_ci.get_coverage_percentage,
+                "%s report | grep TOTAL | awk '{print $(NF)}' | sed 's/.$//'" % os.path.join(
+                    '.virtualenv', 'bin', 'coverage'
+                )
+            )
+
             self.assertEqual(bot_ci.skip_coverage, False)
             self.assertEqual(bot_ci.min_coverage, 100)
-            self.assertEqual(bot_ci.run_bot, [
-                os.path.join('.virtualenv', 'bin', 'python'), 'bot.py'
-            ])
+            self.assertEqual(bot_ci.run_bot, '%s bot.py' % os.path.join('.virtualenv', 'bin', 'python'))
+
             self.assertEqual(bot_ci.tags_map, {})
             self.assertEqual(bot_ci.pid, None)
             self.assertEqual(bot_ci.old_version, None)
@@ -231,8 +226,8 @@ class TestCI(unittest.TestCase):
                 create_virtualenv='python3 -m venv .virtualenv',
                 install_requirements='.virtualenv/bin/pip install repo',
                 run_tests='.virtualenv/bin/python -m test',
+                get_coverage_percentage='.virtualenv/bin/coverage foo bar',
                 run_bot='.virtualenv/bin/python -m bot',
-                get_coverage_percentage='.virtualenv/bin/coverage foo bar'
             ))
             bot_ci = BotCi(**args)
 
@@ -269,25 +264,15 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.python_executable, 'python3')
             self.assertEqual(bot_ci.virtualenv_path, '.virtualenv')
             self.assertEqual(bot_ci.bin_path, os.path.join('.virtualenv', 'bin'))
-            self.assertEqual(bot_ci.create_virtualenv, [
-                'python3', '-m', 'venv', '.virtualenv'
-            ])
+            self.assertEqual(bot_ci.create_virtualenv, 'python3 -m venv .virtualenv')
             self.assertEqual(bot_ci.requirements_path, 'requirements.txt')
-            self.assertEqual(bot_ci.install_requirements, [
-                '.virtualenv/bin/pip', 'install', 'repo'
-            ])
-            self.assertEqual(bot_ci.run_tests, [
-                '.virtualenv/bin/python', '-m', 'test'
-            ])
+            self.assertEqual(bot_ci.install_requirements, '.virtualenv/bin/pip install repo')
+            self.assertEqual(bot_ci.run_tests, '.virtualenv/bin/python -m test')
             self.assertEqual(bot_ci.skip_tests, False)
-            self.assertEqual(bot_ci.get_coverage_percentage, [
-                '.virtualenv/bin/coverage', 'foo', 'bar'
-            ])
+            self.assertEqual(bot_ci.get_coverage_percentage, '.virtualenv/bin/coverage foo bar')
             self.assertEqual(bot_ci.skip_coverage, False)
             self.assertEqual(bot_ci.min_coverage, 100)
-            self.assertEqual(bot_ci.run_bot, [
-                '.virtualenv/bin/python', '-m', 'bot'
-            ])
+            self.assertEqual(bot_ci.run_bot, '.virtualenv/bin/python -m bot')
             self.assertEqual(bot_ci.tags_map, {})
             self.assertEqual(bot_ci.pid, None)
             self.assertEqual(bot_ci.old_version, None)
@@ -346,26 +331,27 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.python_executable, '/usr/local/bin/python2.7')
             self.assertEqual(bot_ci.virtualenv_path, 'my/virtualenv/path')
             self.assertEqual(bot_ci.bin_path, os.path.join('my/virtualenv/path', 'bin'))
-            self.assertEqual(bot_ci.create_virtualenv, [
-                'virtualenv', 'my/virtualenv/path', '--no-site-packages', '-p', '/usr/local/bin/python2.7'
-            ])
+            self.assertEqual(
+                bot_ci.create_virtualenv,
+                'virtualenv my/virtualenv/path --no-site-packages -p /usr/local/bin/python2.7'
+            )
             self.assertEqual(bot_ci.requirements_path, 'path/to/requirements.txt')
-            self.assertEqual(bot_ci.install_requirements, [
-                os.path.join('my/virtualenv/path', 'bin', 'pip'), 'install', '-r', 'path/to/requirements.txt'
-            ])
-            self.assertEqual(bot_ci.run_tests, [
-                os.path.join('my/virtualenv/path', 'bin', 'pytest'), '--cov=bot'
-            ])
+            self.assertEqual(
+                bot_ci.install_requirements,
+                '%s install -r path/to/requirements.txt' % os.path.join('my/virtualenv/path', 'bin', 'pip')
+            )
+            self.assertEqual(bot_ci.run_tests, '%s --cov=bot' % os.path.join('my/virtualenv/path', 'bin', 'pytest'))
+
             self.assertEqual(bot_ci.skip_tests, True)
-            self.assertEqual(bot_ci.get_coverage_percentage, [
-                os.path.join('my/virtualenv/path', 'bin', 'coverage'), "report", "|", "tail", "-1", "|", "awk",
-                "'{print $(NF)}'", "|", "sed", "'s/.$//'"
-            ])
+            self.assertEqual(
+                bot_ci.get_coverage_percentage,
+                '%s report | grep TOTAL | awk \'{print $(NF)}\' | sed \'s/.$//\'' % os.path.join(
+                    'my/virtualenv/path', 'bin', 'coverage'
+                )
+            )
             self.assertEqual(bot_ci.skip_coverage, True)
             self.assertEqual(bot_ci.min_coverage, 50)
-            self.assertEqual(bot_ci.run_bot, [
-                os.path.join('my/virtualenv/path', 'bin', 'python'), 'bot.py'
-            ])
+            self.assertEqual(bot_ci.run_bot, '%s bot.py' % os.path.join('my/virtualenv/path', 'bin', 'python'))
             self.assertEqual(bot_ci.tags_map, {})
             self.assertEqual(bot_ci.pid, None)
             self.assertEqual(bot_ci.old_version, None)
@@ -464,7 +450,7 @@ class TestCI(unittest.TestCase):
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
             self.assertEqual(bot_ci.call_create_virtualenv(), 0)
 
-            popen_mock.assert_called_once_with(bot_ci.create_virtualenv, cwd=bot_ci.repo_path)
+            popen_mock.assert_called_once_with(bot_ci.create_virtualenv, cwd=bot_ci.repo_path, shell=True)
             popen.wait.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
@@ -476,7 +462,7 @@ class TestCI(unittest.TestCase):
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
             self.assertEqual(bot_ci.call_create_virtualenv(), 1)
 
-            popen_mock.assert_called_once_with(bot_ci.create_virtualenv, cwd=bot_ci.repo_path)
+            popen_mock.assert_called_once_with(bot_ci.create_virtualenv, cwd=bot_ci.repo_path, shell=True)
             popen.wait.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
@@ -513,7 +499,7 @@ class TestCI(unittest.TestCase):
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
             self.assertEqual(bot_ci.call_install_requirements(), 0)
 
-            popen_mock.assert_called_once_with(bot_ci.install_requirements, cwd=bot_ci.repo_path)
+            popen_mock.assert_called_once_with(bot_ci.install_requirements, cwd=bot_ci.repo_path, shell=True)
             popen.wait.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
@@ -525,7 +511,7 @@ class TestCI(unittest.TestCase):
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
             self.assertEqual(bot_ci.call_install_requirements(), 1)
 
-            popen_mock.assert_called_once_with(bot_ci.install_requirements, cwd=bot_ci.repo_path)
+            popen_mock.assert_called_once_with(bot_ci.install_requirements, cwd=bot_ci.repo_path, shell=True)
             popen.wait.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
@@ -537,7 +523,7 @@ class TestCI(unittest.TestCase):
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
             self.assertEqual(bot_ci.call_run_tests(), 0)
 
-            popen_mock.assert_called_once_with(bot_ci.run_tests, cwd=bot_ci.repo_path)
+            popen_mock.assert_called_once_with(bot_ci.run_tests, cwd=bot_ci.repo_path, shell=True)
             popen.wait.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
@@ -549,7 +535,7 @@ class TestCI(unittest.TestCase):
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
             self.assertEqual(bot_ci.call_run_tests(), 1)
 
-            popen_mock.assert_called_once_with(bot_ci.run_tests, cwd=bot_ci.repo_path)
+            popen_mock.assert_called_once_with(bot_ci.run_tests, cwd=bot_ci.repo_path, shell=True)
             popen.wait.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
@@ -570,11 +556,20 @@ class TestCI(unittest.TestCase):
 
         popen = mock.Mock()
         popen.wait.return_value = 0
+        popen.stdout.read.return_value = '99'
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
             self.assertEqual(bot_ci.call_get_coverage_percentage(), 0)
 
-            popen_mock.assert_called_once_with(bot_ci.get_coverage_percentage, cwd=bot_ci.repo_path)
+            self.assertEqual(bot_ci.coverage, 99)
+
+            popen_mock.assert_called_once_with(
+                bot_ci.get_coverage_percentage,
+                cwd=bot_ci.repo_path,
+                shell=True,
+                stdout=subprocess.PIPE,
+            )
             popen.wait.assert_called_once_with()
+            popen.stdout.read.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
     def test_call_get_coverage_percentage_error(self, *args):
@@ -582,11 +577,18 @@ class TestCI(unittest.TestCase):
 
         popen = mock.Mock()
         popen.wait.return_value = 1
+        popen.stdout.read.return_value = '99'
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
             self.assertEqual(bot_ci.call_get_coverage_percentage(), 1)
 
-            popen_mock.assert_called_once_with(bot_ci.get_coverage_percentage, cwd=bot_ci.repo_path)
+            popen_mock.assert_called_once_with(
+                bot_ci.get_coverage_percentage,
+                cwd=bot_ci.repo_path,
+                shell=True,
+                stdout=subprocess.PIPE,
+            )
             popen.wait.assert_called_once_with()
+            popen.stdout.read.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_call_get_coverage_percentage_skip(self, *args):
@@ -652,7 +654,7 @@ class TestCI(unittest.TestCase):
 
             self.assertTrue(os.path.exists(bot_ci.pid_file_path))
 
-            popen_mock.assert_called_once_with(bot_ci.run_bot, cwd=bot_ci.repo_path)
+            popen_mock.assert_called_once_with(bot_ci.run_bot, cwd=bot_ci.repo_path, shell=True)
 
     @mock.patch.object(BotCi, 'check')
     def test_restart_bot(self, *args):
