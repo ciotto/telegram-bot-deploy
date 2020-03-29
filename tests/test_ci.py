@@ -108,6 +108,8 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.msg_create_virtualenv_fail, None)
             self.assertEqual(bot_ci.msg_install_requirements_fail, None)
             self.assertEqual(bot_ci.msg_run_tests_fail, None)
+            self.assertEqual(bot_ci.msg_coverage_fail, None)
+            self.assertEqual(bot_ci.msg_coverage_low, None)
             self.assertEqual(bot_ci.msg_restart_fail, None)
             self.assertEqual(bot_ci.msg_new_version, None)
             self.assertEqual(bot_ci.pid_file_path, os.path.join('repo', '.pid'))
@@ -121,9 +123,14 @@ class TestCI(unittest.TestCase):
                 'pip', 'install', '-r', 'requirements.txt'
             ])
             self.assertEqual(bot_ci.run_tests, [
-                'pytest'
+                'pytest', '--cov=bot'
             ])
             self.assertEqual(bot_ci.skip_tests, False)
+            self.assertEqual(bot_ci.get_coverage_percentage, [
+                "coverage", "report", "|", "tail", "-1", "|", "awk", "'{print $(NF)}'", "|", "sed", "'s/.$//'"
+            ])
+            self.assertEqual(bot_ci.skip_coverage, False)
+            self.assertEqual(bot_ci.min_coverage, 0)
             self.assertEqual(bot_ci.run_bot, [
                 'python', 'bot.py'
             ])
@@ -131,6 +138,7 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.pid, None)
             self.assertEqual(bot_ci.old_version, None)
             self.assertEqual(bot_ci.version, None)
+            self.assertEqual(bot_ci.coverage, None)
             self.assertEqual(bot_ci.remote_commit, None)
             self.assertEqual(bot_ci.last_tag, None)
             self.assertEqual(bot_ci.author, None)
@@ -163,6 +171,14 @@ class TestCI(unittest.TestCase):
                 "Error during tests run for version %(version)s!"
             )
             self.assertEqual(
+                bot_ci.msg_coverage_fail,
+                "Error during get coverage run for version %(version)s!"
+            )
+            self.assertEqual(
+                bot_ci.msg_coverage_low,
+                "Coverage too low for version %(version)s!"
+            )
+            self.assertEqual(
                 bot_ci.msg_restart_fail,
                 "Error during bot restart for version %(version)s!"
             )
@@ -183,9 +199,15 @@ class TestCI(unittest.TestCase):
                 os.path.join('.virtualenv', 'bin', 'pip'), 'install', '-r', 'requirements.txt'
             ])
             self.assertEqual(bot_ci.run_tests, [
-                os.path.join('.virtualenv', 'bin', 'pytest')
+                os.path.join('.virtualenv', 'bin', 'pytest'), '--cov=bot'
             ])
             self.assertEqual(bot_ci.skip_tests, False)
+            self.assertEqual(bot_ci.get_coverage_percentage, [
+                os.path.join('.virtualenv', 'bin', 'coverage'), "report", "|", "tail", "-1", "|", "awk",
+                "'{print $(NF)}'", "|", "sed", "'s/.$//'"
+            ])
+            self.assertEqual(bot_ci.skip_coverage, False)
+            self.assertEqual(bot_ci.min_coverage, 100)
             self.assertEqual(bot_ci.run_bot, [
                 os.path.join('.virtualenv', 'bin', 'python'), 'bot.py'
             ])
@@ -193,6 +215,7 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.pid, None)
             self.assertEqual(bot_ci.old_version, None)
             self.assertEqual(bot_ci.version, None)
+            self.assertEqual(bot_ci.coverage, None)
             self.assertEqual(bot_ci.remote_commit, None)
             self.assertEqual(bot_ci.last_tag, None)
             self.assertEqual(bot_ci.author, None)
@@ -209,6 +232,7 @@ class TestCI(unittest.TestCase):
                 install_requirements='.virtualenv/bin/pip install repo',
                 run_tests='.virtualenv/bin/python -m test',
                 run_bot='.virtualenv/bin/python -m bot',
+                get_coverage_percentage='.virtualenv/bin/coverage foo bar'
             ))
             bot_ci = BotCi(**args)
 
@@ -256,6 +280,11 @@ class TestCI(unittest.TestCase):
                 '.virtualenv/bin/python', '-m', 'test'
             ])
             self.assertEqual(bot_ci.skip_tests, False)
+            self.assertEqual(bot_ci.get_coverage_percentage, [
+                '.virtualenv/bin/coverage', 'foo', 'bar'
+            ])
+            self.assertEqual(bot_ci.skip_coverage, False)
+            self.assertEqual(bot_ci.min_coverage, 100)
             self.assertEqual(bot_ci.run_bot, [
                 '.virtualenv/bin/python', '-m', 'bot'
             ])
@@ -263,6 +292,7 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.pid, None)
             self.assertEqual(bot_ci.old_version, None)
             self.assertEqual(bot_ci.version, None)
+            self.assertEqual(bot_ci.coverage, None)
             self.assertEqual(bot_ci.remote_commit, None)
             self.assertEqual(bot_ci.last_tag, None)
             self.assertEqual(bot_ci.author, None)
@@ -282,6 +312,8 @@ class TestCI(unittest.TestCase):
                 msg_create_virtualenv_fail='Version %(version)s!',
                 msg_install_requirements_fail='Version %(version)s!',
                 msg_run_tests_fail='Version %(version)s!',
+                msg_coverage_fail='Version %(version)s!',
+                msg_coverage_low='Version %(version)s!',
                 msg_restart_fail='Version %(version)s!',
                 msg_new_version='Version %(version)s!',
                 pid_file_path='mypidfile',
@@ -290,6 +322,8 @@ class TestCI(unittest.TestCase):
                 virtualenv_path='my/virtualenv/path',
                 requirements_path='path/to/requirements.txt',
                 skip_tests=True,
+                skip_coverage=True,
+                min_coverage=50,
             )
 
             self.assertEqual(bot_ci.repo_url, 'git@github.com:foo/bar.git')
@@ -303,6 +337,8 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.msg_create_virtualenv_fail, 'Version %(version)s!')
             self.assertEqual(bot_ci.msg_install_requirements_fail, 'Version %(version)s!')
             self.assertEqual(bot_ci.msg_run_tests_fail, 'Version %(version)s!')
+            self.assertEqual(bot_ci.msg_coverage_fail, 'Version %(version)s!')
+            self.assertEqual(bot_ci.msg_coverage_low, 'Version %(version)s!')
             self.assertEqual(bot_ci.msg_restart_fail, 'Version %(version)s!')
             self.assertEqual(bot_ci.msg_new_version, 'Version %(version)s!')
             self.assertEqual(bot_ci.pid_file_path, 'mypidfile')
@@ -318,9 +354,15 @@ class TestCI(unittest.TestCase):
                 os.path.join('my/virtualenv/path', 'bin', 'pip'), 'install', '-r', 'path/to/requirements.txt'
             ])
             self.assertEqual(bot_ci.run_tests, [
-                os.path.join('my/virtualenv/path', 'bin', 'pytest')
+                os.path.join('my/virtualenv/path', 'bin', 'pytest'), '--cov=bot'
             ])
             self.assertEqual(bot_ci.skip_tests, True)
+            self.assertEqual(bot_ci.get_coverage_percentage, [
+                os.path.join('my/virtualenv/path', 'bin', 'coverage'), "report", "|", "tail", "-1", "|", "awk",
+                "'{print $(NF)}'", "|", "sed", "'s/.$//'"
+            ])
+            self.assertEqual(bot_ci.skip_coverage, True)
+            self.assertEqual(bot_ci.min_coverage, 50)
             self.assertEqual(bot_ci.run_bot, [
                 os.path.join('my/virtualenv/path', 'bin', 'python'), 'bot.py'
             ])
@@ -328,6 +370,7 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.pid, None)
             self.assertEqual(bot_ci.old_version, None)
             self.assertEqual(bot_ci.version, None)
+            self.assertEqual(bot_ci.coverage, None)
             self.assertEqual(bot_ci.remote_commit, None)
             self.assertEqual(bot_ci.last_tag, None)
             self.assertEqual(bot_ci.author, None)
@@ -492,7 +535,7 @@ class TestCI(unittest.TestCase):
         popen = mock.Mock()
         popen.wait.return_value = 0
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
-            self.assertFalse(bot_ci.call_run_tests())
+            self.assertEqual(bot_ci.call_run_tests(), 0)
 
             popen_mock.assert_called_once_with(bot_ci.run_tests, cwd=bot_ci.repo_path)
             popen.wait.assert_called_once_with()
@@ -516,7 +559,55 @@ class TestCI(unittest.TestCase):
         popen = mock.Mock()
         popen.wait.return_value = 0
         with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
-            self.assertFalse(bot_ci.call_run_tests())
+            self.assertEqual(bot_ci.call_run_tests(), 0)
+
+            popen_mock.assert_not_called()
+            popen.wait.assert_not_called()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_call_get_coverage_percentage(self, *args):
+        bot_ci = BotCi(skip_tests=False)
+
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_get_coverage_percentage(), 0)
+
+            popen_mock.assert_called_once_with(bot_ci.get_coverage_percentage, cwd=bot_ci.repo_path)
+            popen.wait.assert_called_once_with()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_call_get_coverage_percentage_error(self, *args):
+        bot_ci = BotCi(skip_tests=False)
+
+        popen = mock.Mock()
+        popen.wait.return_value = 1
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_get_coverage_percentage(), 1)
+
+            popen_mock.assert_called_once_with(bot_ci.get_coverage_percentage, cwd=bot_ci.repo_path)
+            popen.wait.assert_called_once_with()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_call_get_coverage_percentage_skip(self, *args):
+        bot_ci = BotCi(skip_coverage=True)
+
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_get_coverage_percentage(), 0)
+
+            popen_mock.assert_not_called()
+            popen.wait.assert_not_called()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_call_get_coverage_percentage_skip_test(self, *args):
+        bot_ci = BotCi(skip_tests=True)
+
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_get_coverage_percentage(), 0)
 
             popen_mock.assert_not_called()
             popen.wait.assert_not_called()
@@ -620,6 +711,8 @@ class TestCI(unittest.TestCase):
         bot_ci.old_version = 'v1.0'
         bot_ci.version = 'v2.0'
         bot_ci.author = 'the author'
+        bot_ci.min_coverage = 42
+        bot_ci.coverage = 10
 
         self.assertEqual(
             bot_ci.get_context(),
@@ -627,6 +720,8 @@ class TestCI(unittest.TestCase):
                 old_version='v1.0',
                 version='v2.0',
                 author='the author',
+                min_coverage=42,
+                coverage=10,
             )
         )
 
@@ -667,6 +762,30 @@ class TestCI(unittest.TestCase):
             send_message_mock.assert_called_once_with('Version v2.0 by the author, old version v1.0')
 
     @mock.patch.object(BotCi, 'check')
+    def test_send_get_coverage_fail_message(self, *args):
+        bot_ci = BotCi(msg_coverage_fail='Version %(version)s by %(author)s, old version %(old_version)s')
+        bot_ci.old_version = 'v1.0'
+        bot_ci.version = 'v2.0'
+        bot_ci.author = 'the author'
+
+        with mock.patch.object(bot_ci, 'send_message') as send_message_mock:
+            bot_ci.send_get_coverage_fail_message()
+
+            send_message_mock.assert_called_once_with('Version v2.0 by the author, old version v1.0')
+
+    @mock.patch.object(BotCi, 'check')
+    def test_send_low_coverage_fail_message(self, *args):
+        bot_ci = BotCi(msg_coverage_low='Version %(version)s by %(author)s, old version %(old_version)s')
+        bot_ci.old_version = 'v1.0'
+        bot_ci.version = 'v2.0'
+        bot_ci.author = 'the author'
+
+        with mock.patch.object(bot_ci, 'send_message') as send_message_mock:
+            bot_ci.send_low_coverage_fail_message()
+
+            send_message_mock.assert_called_once_with('Version v2.0 by the author, old version v1.0')
+
+    @mock.patch.object(BotCi, 'check')
     def test_send_restart_fail_message(self, *args):
         bot_ci = BotCi(msg_restart_fail='Version %(version)s by %(author)s, old version %(old_version)s')
         bot_ci.old_version = 'v1.0'
@@ -698,6 +817,8 @@ class TestCI(unittest.TestCase):
             bot_ci.send_create_virtualenv_fail_message()
             bot_ci.send_install_requirements_fail_message()
             bot_ci.send_run_tests_fail_message()
+            bot_ci.send_get_coverage_fail_message()
+            bot_ci.send_low_coverage_fail_message()
             bot_ci.send_restart_fail_message()
             bot_ci.send_new_version_message()
 
@@ -734,13 +855,18 @@ class TestCI(unittest.TestCase):
         def error(msg):
             self.fail('error() method called: %s' % msg)
 
-        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master', min_coverage=100)
+
+        def set_coverage():
+            bot_ci.coverage = 100
 
         with mock.patch.object(bot_ci, 'error', side_effect=error), \
                 mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
                 mock.patch.object(bot_ci, 'call_install_requirements',
                                   return_value=0) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'call_get_coverage_percentage',
+                                  return_value=0, side_effect=set_coverage) as call_get_coverage_percentage_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
                 mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
                                   ) as send_create_virtualenv_fail_message_mock, \
@@ -748,6 +874,10 @@ class TestCI(unittest.TestCase):
                                   ) as send_install_requirements_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_run_tests_fail_message'
                                   ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_get_coverage_fail_message'
+                                  ) as send_get_coverage_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_low_coverage_fail_message'
+                                  ) as send_low_coverage_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_restart_fail_message'
                                   ) as send_restart_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_new_version_message'
@@ -758,26 +888,33 @@ class TestCI(unittest.TestCase):
             except SystemExit:
                 pass
 
+            self.assertEqual(bot_ci.coverage, 100)
+
             # Check methods calls
             call_create_virtualenv_mock.assert_called_once_with()
             call_install_requirements_mock.assert_called_once_with()
             call_run_tests_mock.assert_called_once_with()
+            call_get_coverage_percentage_mock.assert_called_once_with()
             restart_bot_mock.assert_called_once_with()
             send_create_virtualenv_fail_message_mock.assert_not_called()
             send_install_requirements_fail_message_mock.assert_not_called()
             send_run_tests_fail_message_mock.assert_not_called()
+            send_get_coverage_fail_message_mock.assert_not_called()
+            send_low_coverage_fail_message_mock.assert_not_called()
             send_restart_fail_message_mock.assert_not_called()
             send_new_version_message_mock.assert_called_once_with()
 
     @mock.patch.object(BotCi, 'check')
     def test_release_flow_fail_create_virtualenv(self, *args):
-        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master', min_coverage=100)
 
         with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
                 mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=1) as call_create_virtualenv_mock, \
                 mock.patch.object(bot_ci, 'call_install_requirements',
                                   return_value=0) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'call_get_coverage_percentage',
+                                  return_value=0) as call_get_coverage_percentage_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
                 mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
                                   ) as send_create_virtualenv_fail_message_mock, \
@@ -785,6 +922,10 @@ class TestCI(unittest.TestCase):
                                   ) as send_install_requirements_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_run_tests_fail_message'
                                   ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_get_coverage_fail_message'
+                                  ) as send_get_coverage_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_low_coverage_fail_message'
+                                  ) as send_low_coverage_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_restart_fail_message'
                                   ) as send_restart_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_new_version_message'
@@ -794,28 +935,35 @@ class TestCI(unittest.TestCase):
                 bot_ci.release_flow()
             except SystemExit:
                 pass
+
+            self.assertIsNone(bot_ci.coverage)
 
             # Check methods calls
             error_mock.assert_called_once()
             call_create_virtualenv_mock.assert_called_once_with()
             call_install_requirements_mock.assert_not_called()
             call_run_tests_mock.assert_not_called()
+            call_get_coverage_percentage_mock.assert_not_called()
             restart_bot_mock.assert_not_called()
             send_create_virtualenv_fail_message_mock.assert_called_once_with()
             send_install_requirements_fail_message_mock.assert_not_called()
             send_run_tests_fail_message_mock.assert_not_called()
+            send_get_coverage_fail_message_mock.assert_not_called()
+            send_low_coverage_fail_message_mock.assert_not_called()
             send_restart_fail_message_mock.assert_not_called()
             send_new_version_message_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_release_flow_fail_install_requirements(self, *args):
-        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master', min_coverage=100)
 
         with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
                 mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
                 mock.patch.object(bot_ci, 'call_install_requirements',
                                   return_value=1) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'call_get_coverage_percentage',
+                                  return_value=0) as call_get_coverage_percentage_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
                 mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
                                   ) as send_create_virtualenv_fail_message_mock, \
@@ -823,6 +971,10 @@ class TestCI(unittest.TestCase):
                                   ) as send_install_requirements_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_run_tests_fail_message'
                                   ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_get_coverage_fail_message'
+                                  ) as send_get_coverage_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_low_coverage_fail_message'
+                                  ) as send_low_coverage_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_restart_fail_message'
                                   ) as send_restart_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_new_version_message'
@@ -832,28 +984,35 @@ class TestCI(unittest.TestCase):
                 bot_ci.release_flow()
             except SystemExit:
                 pass
+
+            self.assertIsNone(bot_ci.coverage)
 
             # Check methods calls
             error_mock.assert_called_once()
             call_create_virtualenv_mock.assert_called_once_with()
             call_install_requirements_mock.assert_called_once_with()
             call_run_tests_mock.assert_not_called()
+            call_get_coverage_percentage_mock.assert_not_called()
             restart_bot_mock.assert_not_called()
             send_create_virtualenv_fail_message_mock.assert_not_called()
             send_install_requirements_fail_message_mock.assert_called_once_with()
             send_run_tests_fail_message_mock.assert_not_called()
+            send_get_coverage_fail_message_mock.assert_not_called()
+            send_low_coverage_fail_message_mock.assert_not_called()
             send_restart_fail_message_mock.assert_not_called()
             send_new_version_message_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_release_flow_fail_run_tests(self, *args):
-        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master', min_coverage=100)
 
         with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
                 mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
                 mock.patch.object(bot_ci, 'call_install_requirements',
                                   return_value=0) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=1) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'call_get_coverage_percentage',
+                                  return_value=0) as call_get_coverage_percentage_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
                 mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
                                   ) as send_create_virtualenv_fail_message_mock, \
@@ -861,6 +1020,10 @@ class TestCI(unittest.TestCase):
                                   ) as send_install_requirements_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_run_tests_fail_message'
                                   ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_get_coverage_fail_message'
+                                  ) as send_get_coverage_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_low_coverage_fail_message'
+                                  ) as send_low_coverage_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_restart_fail_message'
                                   ) as send_restart_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_new_version_message'
@@ -871,27 +1034,138 @@ class TestCI(unittest.TestCase):
             except SystemExit:
                 pass
 
+            self.assertIsNone(bot_ci.coverage)
+
             # Check methods calls
             error_mock.assert_called_once()
             call_create_virtualenv_mock.assert_called_once_with()
             call_install_requirements_mock.assert_called_once_with()
             call_run_tests_mock.assert_called_once_with()
+            call_get_coverage_percentage_mock.assert_not_called()
             restart_bot_mock.assert_not_called()
             send_create_virtualenv_fail_message_mock.assert_not_called()
             send_install_requirements_fail_message_mock.assert_not_called()
             send_run_tests_fail_message_mock.assert_called_once_with()
+            send_get_coverage_fail_message_mock.assert_not_called()
+            send_low_coverage_fail_message_mock.assert_not_called()
             send_restart_fail_message_mock.assert_not_called()
             send_new_version_message_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
-    def test_release_flow_fail_restart_bot(self, *args):
-        bot_ci = BotCi(repo_path=get_random_path(), branch='master')
+    def test_release_flow_fail_get_coverage(self, *args):
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master', min_coverage=100)
 
         with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
                 mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
                 mock.patch.object(bot_ci, 'call_install_requirements',
                                   return_value=0) as call_install_requirements_mock, \
                 mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'call_get_coverage_percentage',
+                                  return_value=1) as call_get_coverage_percentage_mock, \
+                mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
+                mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
+                                  ) as send_create_virtualenv_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_install_requirements_fail_message'
+                                  ) as send_install_requirements_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_run_tests_fail_message'
+                                  ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_get_coverage_fail_message'
+                                  ) as send_get_coverage_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_low_coverage_fail_message'
+                                  ) as send_low_coverage_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_restart_fail_message'
+                                  ) as send_restart_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message'
+                                  ) as send_new_version_message_mock:
+
+            try:
+                bot_ci.release_flow()
+            except SystemExit:
+                pass
+
+            self.assertIsNone(bot_ci.coverage)
+
+            # Check methods calls
+            error_mock.assert_called_once()
+            call_create_virtualenv_mock.assert_called_once_with()
+            call_install_requirements_mock.assert_called_once_with()
+            call_run_tests_mock.assert_called_once_with()
+            call_get_coverage_percentage_mock.assert_called_once_with()
+            restart_bot_mock.assert_not_called()
+            send_create_virtualenv_fail_message_mock.assert_not_called()
+            send_install_requirements_fail_message_mock.assert_not_called()
+            send_run_tests_fail_message_mock.assert_not_called()
+            send_get_coverage_fail_message_mock.assert_called_once_with()
+            send_low_coverage_fail_message_mock.assert_not_called()
+            send_restart_fail_message_mock.assert_not_called()
+            send_new_version_message_mock.assert_not_called()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_release_flow_coverage_low(self, *args):
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master', min_coverage=100)
+
+        def set_coverage():
+            bot_ci.coverage = 99
+
+        with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
+                mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
+                mock.patch.object(bot_ci, 'call_install_requirements',
+                                  return_value=0) as call_install_requirements_mock, \
+                mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'call_get_coverage_percentage',
+                                  return_value=0, side_effect=set_coverage) as call_get_coverage_percentage_mock, \
+                mock.patch.object(bot_ci, 'restart_bot', return_value=0) as restart_bot_mock, \
+                mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
+                                  ) as send_create_virtualenv_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_install_requirements_fail_message'
+                                  ) as send_install_requirements_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_run_tests_fail_message'
+                                  ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_get_coverage_fail_message'
+                                  ) as send_get_coverage_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_low_coverage_fail_message'
+                                  ) as send_low_coverage_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_restart_fail_message'
+                                  ) as send_restart_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_new_version_message'
+                                  ) as send_new_version_message_mock:
+
+            try:
+                bot_ci.release_flow()
+            except SystemExit:
+                pass
+
+            self.assertEqual(bot_ci.coverage, 99)
+
+            # Check methods calls
+            error_mock.assert_called_once()
+            call_create_virtualenv_mock.assert_called_once_with()
+            call_install_requirements_mock.assert_called_once_with()
+            call_run_tests_mock.assert_called_once_with()
+            call_get_coverage_percentage_mock.assert_called_once_with()
+            restart_bot_mock.assert_not_called()
+            send_create_virtualenv_fail_message_mock.assert_not_called()
+            send_install_requirements_fail_message_mock.assert_not_called()
+            send_run_tests_fail_message_mock.assert_not_called()
+            send_get_coverage_fail_message_mock.assert_not_called()
+            send_low_coverage_fail_message_mock.assert_called_once_with()
+            send_restart_fail_message_mock.assert_not_called()
+            send_new_version_message_mock.assert_not_called()
+
+    @mock.patch.object(BotCi, 'check')
+    def test_release_flow_fail_restart_bot(self, *args):
+        bot_ci = BotCi(repo_path=get_random_path(), branch='master', min_coverage=100)
+
+        def set_coverage():
+            bot_ci.coverage = 100
+
+        with mock.patch.object(bot_ci, 'error', side_effect=SystemExit) as error_mock, \
+                mock.patch.object(bot_ci, 'call_create_virtualenv', return_value=0) as call_create_virtualenv_mock, \
+                mock.patch.object(bot_ci, 'call_install_requirements',
+                                  return_value=0) as call_install_requirements_mock, \
+                mock.patch.object(bot_ci, 'call_run_tests', return_value=0) as call_run_tests_mock, \
+                mock.patch.object(bot_ci, 'call_get_coverage_percentage',
+                                  return_value=0, side_effect=set_coverage) as call_get_coverage_percentage_mock, \
                 mock.patch.object(bot_ci, 'restart_bot', return_value=1) as restart_bot_mock, \
                 mock.patch.object(bot_ci, 'send_create_virtualenv_fail_message'
                                   ) as send_create_virtualenv_fail_message_mock, \
@@ -899,6 +1173,10 @@ class TestCI(unittest.TestCase):
                                   ) as send_install_requirements_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_run_tests_fail_message'
                                   ) as send_run_tests_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_get_coverage_fail_message'
+                                  ) as send_get_coverage_fail_message_mock, \
+                mock.patch.object(bot_ci, 'send_low_coverage_fail_message'
+                                  ) as send_low_coverage_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_restart_fail_message'
                                   ) as send_restart_fail_message_mock, \
                 mock.patch.object(bot_ci, 'send_new_version_message'
@@ -909,15 +1187,20 @@ class TestCI(unittest.TestCase):
             except SystemExit:
                 pass
 
+            self.assertEqual(bot_ci.coverage, 100)
+
             # Check methods calls
             error_mock.assert_called_once()
             call_create_virtualenv_mock.assert_called_once_with()
             call_install_requirements_mock.assert_called_once_with()
             call_run_tests_mock.assert_called_once_with()
+            call_get_coverage_percentage_mock.assert_called_once_with()
             restart_bot_mock.assert_called_once_with()
             send_create_virtualenv_fail_message_mock.assert_not_called()
             send_install_requirements_fail_message_mock.assert_not_called()
             send_run_tests_fail_message_mock.assert_not_called()
+            send_get_coverage_fail_message_mock.assert_not_called()
+            send_low_coverage_fail_message_mock.assert_not_called()
             send_restart_fail_message_mock.assert_called_once_with()
             send_new_version_message_mock.assert_not_called()
 

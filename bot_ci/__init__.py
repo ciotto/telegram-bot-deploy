@@ -41,6 +41,14 @@ def read_environments():
             'MSG_RUN_TESTS_FAIL',
             "Error during tests run for version %(version)s!"
         ),
+        msg_coverage_fail=getenv(
+            'MSG_COVERAGE_FAIL',
+            "Error during get coverage run for version %(version)s!"
+        ),
+        msg_coverage_low=getenv(
+            'MSG_COVERAGE_LOW',
+            "Coverage too low for version %(version)s!"
+        ),
         msg_restart_fail=getenv(
             'MSG_RESTART_FAIL',
             "Error during bot restart for version %(version)s!"
@@ -60,6 +68,8 @@ def read_environments():
         install_requirements=getenv('INSTALL_REQUIREMENTS'),
 
         run_tests=getenv('RUN_TESTS'),
+        get_coverage_percentage=getenv('GET_COVERAGE_PERCENTAGE'),
+        min_coverage=getenv('MIN_COVERAGE', 100, parser=int),
 
         run_bot=getenv('RUN_BOT'),
 
@@ -71,38 +81,43 @@ def read_environments():
 
 class BotCi:
     def __init__(
-        self,
-        repo_url=None,
-        repo_path=None,
-        branch=None,
+            self,
+            repo_url=None,
+            repo_path=None,
+            branch=None,
 
-        force=False,
+            force=False,
 
-        ssh_key=None,
+            ssh_key=None,
 
-        chat_id=None,
-        bot_token=None,
+            chat_id=None,
+            bot_token=None,
 
-        msg_create_virtualenv_fail=None,
-        msg_install_requirements_fail=None,
-        msg_run_tests_fail=None,
-        msg_restart_fail=None,
-        msg_new_version=None,
+            msg_create_virtualenv_fail=None,
+            msg_install_requirements_fail=None,
+            msg_run_tests_fail=None,
+            msg_coverage_fail=None,
+            msg_coverage_low=None,
+            msg_restart_fail=None,
+            msg_new_version=None,
 
-        pid_file_path=None,
+            pid_file_path=None,
 
-        python_executable=None,
-        virtualenv_path=None,
-        create_virtualenv=None,
+            python_executable=None,
+            virtualenv_path=None,
+            create_virtualenv=None,
 
-        requirements_path=None,
-        install_requirements=None,
+            requirements_path=None,
+            install_requirements=None,
 
-        run_tests=None,
-        skip_tests=False,
+            run_tests=None,
+            skip_tests=False,
+            get_coverage_percentage=None,
+            skip_coverage=False,
+            min_coverage=0,
 
-        run_bot=None,
-        **kwargs
+            run_bot=None,
+            **kwargs
     ):
         # Set defaults
         self.repo_url = repo_url
@@ -123,6 +138,8 @@ class BotCi:
         self.msg_create_virtualenv_fail = msg_create_virtualenv_fail
         self.msg_install_requirements_fail = msg_install_requirements_fail
         self.msg_run_tests_fail = msg_run_tests_fail
+        self.msg_coverage_fail = msg_coverage_fail
+        self.msg_coverage_low = msg_coverage_low
         self.msg_restart_fail = msg_restart_fail
         self.msg_new_version = msg_new_version
 
@@ -151,9 +168,17 @@ class BotCi:
 
         # Tests
         self.run_tests = run_tests.split(' ') if run_tests else [
-            os.path.join(self.bin_path or '', 'pytest')
+            os.path.join(self.bin_path or '', 'pytest'), '--cov=bot'
         ]
         self.skip_tests = skip_tests
+
+        # Coverage percentage
+        self.get_coverage_percentage = get_coverage_percentage.split(' ') if get_coverage_percentage else [
+            os.path.join(self.bin_path or '', 'coverage'), "report", "|", "tail", "-1", "|", "awk", "'{print $(NF)}'",
+            "|", "sed", "'s/.$//'"
+        ]
+        self.skip_coverage = skip_coverage
+        self.min_coverage = min_coverage
 
         # Run
         self.run_bot = run_bot.split(' ') if run_bot else [
@@ -169,6 +194,8 @@ class BotCi:
         # Versions name
         self.old_version = None
         self.version = None
+
+        self.coverage = None
 
         # Last commit on remote
         self.remote_commit = None
@@ -227,8 +254,16 @@ class BotCi:
     def call_run_tests(self):
         """Run tests"""
         if not self.skip_tests:
-            logger.info('Run tests %s' % ' '.join(self.run_tests))
+            logger.info('Run tests: %s' % ' '.join(self.run_tests))
             process = subprocess.Popen(self.run_tests, cwd=self.repo_path)
+            return process.wait()
+        return 0
+
+    def call_get_coverage_percentage(self):
+        """Get coverage percentage"""
+        if not self.skip_tests and not self.skip_coverage:
+            logger.info('Run get coverage percentage: %s' % ' '.join(self.get_coverage_percentage))
+            process = subprocess.Popen(self.get_coverage_percentage, cwd=self.repo_path)
             return process.wait()
         return 0
 
@@ -272,29 +307,41 @@ class BotCi:
             )
         else:
             logger.info('Bot token or chat_id not configured')
-    
+
     def get_context(self):
         return {
-                'old_version': self.old_version,
-                'version': self.version,
-                'author': self.author,
+            'old_version': self.old_version,
+            'version': self.version,
+            'author': self.author,
+            'min_coverage': self.min_coverage,
+            'coverage': self.coverage,
         }
 
     def send_create_virtualenv_fail_message(self):
         """Send a message when create virtualenv fail"""
         if self.msg_create_virtualenv_fail:
             self.send_message(self.msg_create_virtualenv_fail % self.get_context())
-        
+
     def send_install_requirements_fail_message(self):
         """Send a message when install requirements fail"""
         if self.msg_install_requirements_fail:
             self.send_message(self.msg_install_requirements_fail % self.get_context())
-        
+
     def send_run_tests_fail_message(self):
         """Send a message when run tests fail"""
         if self.msg_run_tests_fail:
             self.send_message(self.msg_run_tests_fail % self.get_context())
-        
+
+    def send_get_coverage_fail_message(self):
+        """Send a message when get coverage fail"""
+        if self.msg_coverage_fail:
+            self.send_message(self.msg_coverage_fail % self.get_context())
+
+    def send_low_coverage_fail_message(self):
+        """Send a message when coverage is too low"""
+        if self.msg_coverage_low:
+            self.send_message(self.msg_coverage_low % self.get_context())
+
     def send_restart_fail_message(self):
         """Send a message when bot restart fail"""
         if self.msg_restart_fail:
@@ -324,6 +371,14 @@ class BotCi:
         if self.call_run_tests():
             self.send_run_tests_fail_message()
             self.error('Test error')
+
+        if self.call_get_coverage_percentage():
+            self.send_get_coverage_fail_message()
+            self.error('Missing coverage percentage')
+
+        if self.coverage is not None and self.coverage < self.min_coverage:
+            self.send_low_coverage_fail_message()
+            self.error('Coverage percentage (%s%%) too low' % self.coverage)
 
         if self.restart_bot():
             self.send_restart_fail_message()
@@ -380,11 +435,11 @@ class BotCi:
 def main():
     parser = argparse.ArgumentParser(description='Test and deploy a telegram bot.')
 
-    parser.add_argument('-F', '--logging_format', nargs='?', type=str, default=None,
+    parser.add_argument('--logging_format', nargs='?', type=str, default=None,
                         help='The format for Python logging')
-    parser.add_argument('-l', '--logging_level', nargs='?', type=int, default=None,
+    parser.add_argument('--logging_level', nargs='?', type=int, default=None,
                         help='The level for Python logging')
-    parser.add_argument('-f', '--logging_filename', nargs='?', type=str, default=None,
+    parser.add_argument('--logging_filename', nargs='?', type=str, default=None,
                         help='The filename for Python logging')
 
     parser.add_argument('-u', '--repo_url', nargs='?', type=str, default=None,
@@ -394,38 +449,45 @@ def main():
     parser.add_argument('-b', '--branch', nargs='?', type=str, default=None,
                         help='The branch used for deploy')
 
-    parser.add_argument('-O', '--force', action='store_true',
+    parser.add_argument('-F', '--force', action='store_true',
                         help='Restart also same versions')
 
-    parser.add_argument('-k', '--ssh_key', nargs='?', type=str, default=None,
+    parser.add_argument('--ssh_key', nargs='?', type=str, default=None,
                         help='The SSH key to be used to authenticate to the repo')
 
-    parser.add_argument('-c', '--chat_id', nargs='?', type=str, default=None,
+    parser.add_argument('--chat_id', nargs='?', type=str, default=None,
                         help='The chat ID used for bot communication')
-    parser.add_argument('-t', '--bot_token', nargs='?', type=str, default=None,
+    parser.add_argument('--bot_token', nargs='?', type=str, default=None,
                         help='The bot token used for bot communication')
 
-    parser.add_argument('-P', '--pid_file_path', nargs='?', type=str, default=None,
+    parser.add_argument('--pid_file_path', nargs='?', type=str, default=None,
                         help='The path to the PID file')
 
-    parser.add_argument('-E', '--python_executable', nargs='?', type=str, default=None,
+    parser.add_argument('--python_executable', nargs='?', type=str, default=None,
                         help='The Python executable')
-    parser.add_argument('-v', '--virtualenv_path', nargs='?', type=str, default=None,
+    parser.add_argument('--virtualenv_path', nargs='?', type=str, default=None,
                         help='The path to the Python virtualenv')
-    parser.add_argument('-C', '--create_virtualenv', nargs='?', type=str, default=None,
+    parser.add_argument('--create_virtualenv', nargs='?', type=str, default=None,
                         help='The command used in order to create the Python virtualenv')
 
-    parser.add_argument('-r', '--requirements_path', nargs='?', type=str, default=None,
+    parser.add_argument('--requirements_path', nargs='?', type=str, default=None,
                         help='The path to the requirements file')
-    parser.add_argument('-I', '--install_requirements', nargs='?', type=str, default=None,
+    parser.add_argument('--install_requirements', nargs='?', type=str, default=None,
                         help='The command used in order to install the requirements')
 
-    parser.add_argument('-T', '--run_tests', nargs='?', type=str, default=None,
+    parser.add_argument('--run_tests', nargs='?', type=str, default=None,
                         help='The command used in order to run the tests')
-    parser.add_argument('-s', '--skip_tests', action='store_true',
+    parser.add_argument('-t', '--skip_tests', action='store_true',
                         help='Skip tests')
 
-    parser.add_argument('-R', '--run_bot', nargs='?', type=str, default=None,
+    parser.add_argument('--get_coverage_percentage', nargs='?', type=str, default=None,
+                        help='The command used in order to get the coverage percentage value')
+    parser.add_argument('-c', '--skip_coverage', action='store_true',
+                        help='Skip coverage check')
+    parser.add_argument('--min_coverage', nargs='?', type=int, default=None,
+                        help='The minimal coverage required in order to deploy')
+
+    parser.add_argument('--run_bot', nargs='?', type=str, default=None,
                         help='The command used in order to run the bot')
 
     args = read_environments()

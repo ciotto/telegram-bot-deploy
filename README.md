@@ -43,6 +43,8 @@ The available variables are:
   - `MSG_RUN_TESTS_FAIL`: Message that will be send when run tests fail 
   - `MSG_RESTART_FAIL`: Message that will be send when bot restart fail 
   - `MSG_NEW_VERSION`: Message that will be send when new version was deployed 
+  - `MSG_COVERAGE_FAIL`: Message that will be send when get coverage fail
+  - `MSG_COVERAGE_LOW`: Message that will be send when coverage is too low
 
   - `PID_FILE_PATH`: The SSH key to be used to authenticate to the repo
 
@@ -54,6 +56,8 @@ The available variables are:
   - `INSTALL_REQUIREMENTS`: The Python executable
 
   - `RUN_TESTS`: The path to the Python virtualenv
+  - `MIN_COVERAGE`: The minimal coverage required in order to deploy
+  - `GET_COVERAGE_PERCENTAGE`: The command used in order to get the coverage percentage value
 
   - `RUN_BOT`: The command used in order to create the Python virtualenv
 
