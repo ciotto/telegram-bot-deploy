@@ -591,6 +591,25 @@ class TestCI(unittest.TestCase):
             popen.stdout.read.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
+    def test_call_get_coverage_percentage_parse_error(self, *args):
+        bot_ci = BotCi(skip_tests=False)
+
+        popen = mock.Mock()
+        popen.wait.return_value = 0
+        popen.stdout.read.return_value = 'foo'
+        with mock.patch('subprocess.Popen', return_value=popen) as popen_mock:
+            self.assertEqual(bot_ci.call_get_coverage_percentage(), 'Invalid format')
+
+            popen_mock.assert_called_once_with(
+                bot_ci.get_coverage_percentage,
+                cwd=bot_ci.repo_path,
+                shell=True,
+                stdout=subprocess.PIPE,
+            )
+            popen.wait.assert_called_once_with()
+            popen.stdout.read.assert_called_once_with()
+
+    @mock.patch.object(BotCi, 'check')
     def test_call_get_coverage_percentage_skip(self, *args):
         bot_ci = BotCi(skip_coverage=True)
 
