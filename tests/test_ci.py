@@ -187,7 +187,7 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.python_executable, 'python3')
             self.assertEqual(bot_ci.virtualenv_path, '.virtualenv')
             self.assertEqual(bot_ci.bin_path, os.path.join('.virtualenv', 'bin'))
-            self.assertEqual(bot_ci.create_virtualenv, 'virtualenv .virtualenv --no-site-packages -p python3')
+            self.assertEqual(bot_ci.create_virtualenv, 'virtualenv .virtualenv -p python3')
             self.assertEqual(bot_ci.requirements_path, 'requirements.txt')
             self.assertEqual(bot_ci.install_requirements, '%s install -r requirements.txt' % (
                 os.path.join('.virtualenv', 'bin', 'pip')
@@ -333,7 +333,7 @@ class TestCI(unittest.TestCase):
             self.assertEqual(bot_ci.bin_path, os.path.join('my/virtualenv/path', 'bin'))
             self.assertEqual(
                 bot_ci.create_virtualenv,
-                'virtualenv my/virtualenv/path --no-site-packages -p /usr/local/bin/python2.7'
+                'virtualenv my/virtualenv/path -p /usr/local/bin/python2.7'
             )
             self.assertEqual(bot_ci.requirements_path, 'path/to/requirements.txt')
             self.assertEqual(

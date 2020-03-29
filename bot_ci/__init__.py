@@ -156,7 +156,7 @@ class BotCi:
         if create_virtualenv:
             self.create_virtualenv = create_virtualenv
         elif self.virtualenv_path:
-            self.create_virtualenv = 'virtualenv %s --no-site-packages -p %s' % (
+            self.create_virtualenv = 'virtualenv %s -p %s' % (
                 self.virtualenv_path, self.python_executable
             )
 
