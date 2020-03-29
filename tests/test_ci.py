@@ -1403,11 +1403,18 @@ class TestCI(unittest.TestCase):
             repo.head.reset.assert_not_called()
 
     def test_main(self):
-        with mock.patch('bot_ci.load_dotenv') as load_dotenv_mock, \
+        bot = mock.Mock()
+
+        with mock.patch('bot_ci.read_environments') as read_environments_mock, \
                 mock.patch('logging.basicConfig') as basicConfig_mock, \
-                mock.patch.object(sys, 'argv', ['capitalismo_bot.py']), \
-                mock.patch.object(BotCi, 'check') as check_mock, \
-                mock.patch.object(BotCi, 'run') as run_mock:
+                mock.patch.object(sys, 'argv', ['__main__.py']), \
+                mock.patch('bot_ci.BotCi', return_value=bot) as bot_mock:
+            read_environments_mock.return_value = {
+                'logging_filename': None,
+                'logging_format': '%(asctime)s - %(levelname)s - %(message)s',
+                'logging_level': logging.INFO,
+            }
+
             main()
 
             basicConfig_mock.assert_called_once_with(
@@ -1415,8 +1422,93 @@ class TestCI(unittest.TestCase):
                 format='%(asctime)s - %(levelname)s - %(message)s',
                 level=logging.INFO,
             )
+            read_environments_mock.assert_called_once_with()
+            bot_mock.assert_called_once_with(force=False, skip_coverage=False, skip_tests=False)
+            bot.run.assert_called_once_with()
 
-            load_dotenv_mock.assert_called_once()
-            load_dotenv_mock.assert_called_once()
-            check_mock.assert_called_once_with()
-            run_mock.assert_called_once_with()
+    def test_main_args(self):
+        bot = mock.Mock()
+
+        with mock.patch('bot_ci.read_environments') as read_environments_mock, \
+                mock.patch('logging.basicConfig') as basicConfig_mock, \
+                mock.patch.object(sys, 'argv', [
+                    '__main__.py',
+                    '--logging_format',
+                    '%(asctime)s - %(message)s',
+                    '--logging_level',
+                    '10',
+                    '--logging_filename',
+                    'file.log',
+                    '--repo_url',
+                    'gir@my.repo/foo.git',
+                    '--repo_path',
+                    'repo/folder',
+                    '--branch',
+                    'dev',
+                    '--force',
+                    '--ssh_key',
+                    'my_ssh_key',
+                    '--chat_id',
+                    '-123123',
+                    '--bot_token',
+                    '123123:AAAAAAAAAAAA-AAA-AAAAAAAA',
+                    '--pid_file_path',
+                    'my/pid/file',
+                    '--python_executable',
+                    'python2',
+                    '--virtualenv_path',
+                    'my/virtualenv/path',
+                    '--create_virtualenv',
+                    'create virtualenv',
+                    '--requirements_path',
+                    'my/requirements/path',
+                    '--install_requirements',
+                    'install requirements',
+                    '--run_tests',
+                    'run test',
+                    '--skip_tests',
+                    '--get_coverage_percentage',
+                    'get coverage',
+                    '--skip_coverage',
+                    '--min_coverage',
+                    '90',
+                    '--run_bot',
+                    'run bot',
+                ]),\
+                mock.patch('bot_ci.BotCi', return_value=bot) as bot_mock:
+            read_environments_mock.return_value = {
+                'logging_filename': None,
+                'logging_format': '%(asctime)s - %(levelname)s - %(message)s',
+                'logging_level': logging.INFO,
+            }
+
+            main()
+
+            basicConfig_mock.assert_called_once_with(
+                filename='file.log',
+                format='%(asctime)s - %(message)s',
+                level=logging.DEBUG,
+            )
+            read_environments_mock.assert_called_once_with()
+            bot_mock.assert_called_once_with(
+                bot_token='123123:AAAAAAAAAAAA-AAA-AAAAAAAA',
+                branch='dev',
+                chat_id='-123123',
+                create_virtualenv='create virtualenv',
+                force=True,
+                get_coverage_percentage='get coverage',
+                install_requirements='install requirements',
+                min_coverage=90,
+                pid_file_path='my/pid/file',
+                python_executable='python2',
+                repo_path='repo/folder',
+                repo_url='gir@my.repo/foo.git',
+                requirements_path='my/requirements/path',
+                run_bot='run bot',
+                run_tests='run test',
+                skip_coverage=True,
+                skip_tests=True,
+                ssh_key='my_ssh_key',
+                virtualenv_path='my/virtualenv/path'
+            )
+            bot.run.assert_called_once_with()
