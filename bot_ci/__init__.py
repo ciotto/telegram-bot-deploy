@@ -290,7 +290,7 @@ class BotCi:
     def start_bot(self):
         """Start the bot"""
         # Run bot
-        logger.info('Run bot %s: %s' % (self.version, ' '.join(self.run_bot)))
+        logger.info('Run bot %s: %s' % (self.version, self.run_bot))
         process = subprocess.Popen(self.run_bot, cwd=self.repo_path, shell=True)
         self.pid = process.pid
 
@@ -403,6 +403,7 @@ class BotCi:
 
         # Set old version
         self.old_version = repo.git.describe('--always')
+        logger.info('Old version %s' % self.old_version)
 
         # Fetch origin
         logger.info('Fetch remote %s' % self.repo_url)
@@ -428,7 +429,11 @@ class BotCi:
             # Set author name
             self.author = self.last_tag.tag.object.author.name
 
+            logger.info('New version %s by %s' % (self.version, self.author))
+
             if self.last_tag.tag.object != repo.head.commit or self.force:
+                logger.info('Reset to HEAD')
+
                 # Go to last tag
                 repo.head.reset(self.last_tag, index=True, working_tree=True)
 
