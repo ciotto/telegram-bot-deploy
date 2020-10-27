@@ -23,7 +23,10 @@ package_name = 'telegram-bot-deploy'
 package_path = os.path.abspath(os.path.dirname(__file__))
 long_description_file_path = os.path.join(package_path, 'README.md')
 long_description = ''
-install_requirements = [str(ir.req) for ir in parse_requirements('requirements.txt', session=PipSession())]
+try:
+    install_requirements = [str(ir.req) for ir in parse_requirements('requirements.txt', session=PipSession())]
+except AttributeError:
+    install_requirements = [str(ir.requirement) for ir in parse_requirements('requirements.txt', session=PipSession())]
 try:
     with open(long_description_file_path) as f:
         long_description = f.read()
