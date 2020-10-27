@@ -638,31 +638,37 @@ class TestCI(unittest.TestCase):
         bot_ci = BotCi(pid_file_path=get_random_path())
         write_file(bot_ci.pid_file_path, '123123')
 
-        with mock.patch('bot_ci.os.kill') as kill_mock:
+        with mock.patch('bot_ci.os.killpg') as killpg_mock,\
+                mock.patch('bot_ci.os.getpgid', return_value=321321) as getpgid_mock:
             bot_ci.stop_bot()
 
-            kill_mock.assert_called_once_with(123123, signal.SIGTERM)
+            killpg_mock.assert_called_once_with(321321, signal.SIGTERM)
+            getpgid_mock.assert_called_once_with(123123)
 
     @mock.patch.object(BotCi, 'check')
     def test_stop_bot_stopped(self, *args):
         bot_ci = BotCi(pid_file_path=get_random_path())
         write_file(bot_ci.pid_file_path, '123123')
 
-        with mock.patch('bot_ci.os.kill') as kill_mock:
-            kill_mock.side_effect = OSError
+        with mock.patch('bot_ci.os.killpg') as killpg_mock,\
+                mock.patch('bot_ci.os.getpgid', return_value=321321) as getpgid_mock:
+            killpg_mock.side_effect = OSError
 
             bot_ci.stop_bot()
 
-            kill_mock.assert_called()
+            killpg_mock.assert_called()
+            getpgid_mock.assert_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_stop_bot_not_exists(self, *args):
         bot_ci = BotCi(pid_file_path=get_random_path())
 
-        with mock.patch('bot_ci.os.kill') as kill_mock:
+        with mock.patch('bot_ci.os.killpg') as killpg_mock,\
+                mock.patch('bot_ci.os.getpgid', return_value=321321) as getpgid_mock:
             bot_ci.stop_bot()
 
-            kill_mock.assert_not_called()
+            killpg_mock.assert_not_called()
+            getpgid_mock.assert_not_called()
 
     @mock.patch.object(BotCi, 'check')
     def test_start_bot(self, *args):

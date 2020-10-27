@@ -282,7 +282,7 @@ class BotCi:
             try:
                 with open(self.pid_file_path, 'r') as f:
                     pid = int(f.read())
-                os.kill(pid, signal.SIGTERM)
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
             except OSError:
                 logger.info('Process already stopped')
         return 0
