@@ -16,7 +16,7 @@ except ImportError:
         from pip.download import PipSession
         from pip.req import parse_requirements
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 github_url = 'https://github.com/ciotto'
 package_name = 'telegram-bot-deploy'
